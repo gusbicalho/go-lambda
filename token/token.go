@@ -34,8 +34,8 @@ func (t TokenType) String() string {
 }
 
 type Position struct {
-	Line   int
-	Column int
+	Line   uint
+	Column uint
 }
 
 type Token struct {

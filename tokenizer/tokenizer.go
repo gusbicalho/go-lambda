@@ -1,28 +1,30 @@
 package tokenizer
 
 import (
-	"bufio"
 	"io"
 	"unicode"
 
+	"github.com/gusbicalho/go-lambda/runes_reader"
 	"github.com/gusbicalho/go-lambda/token"
 )
 
 type Tokenizer struct {
-	reader  *bufio.Reader
-	line    int
-	column  int
+	runes   *runes_reader.RunesReader
 	current struct {
 		ready bool
-		rune  rune
+		token token.Token
 	}
+}
+
+type currentToken struct {
+	ready bool
+	token token.Token
 }
 
 func New(r io.Reader) *Tokenizer {
 	return &Tokenizer{
-		reader: bufio.NewReader(r),
-		line:   1,
-		column: 0,
+		runes:   runes_reader.New(r),
+		current: currentToken{ready: false},
 	}
 }
 
@@ -38,6 +40,24 @@ func (t *Tokenizer) Each(action func(token token.Token) error) error {
 }
 
 func (t *Tokenizer) Next() token.Token {
+	tok := t.Peek()
+	t.current = currentToken{ready: false}
+	return tok
+}
+
+func (t *Tokenizer) Peek() token.Token {
+	if t.current.ready {
+		return t.current.token
+	}
+	tok := t.nextFromRunes()
+	t.current = currentToken{
+		ready: true,
+		token: tok,
+	}
+	return tok
+}
+
+func (t *Tokenizer) nextFromRunes() token.Token {
 	pos := t.pos()
 
 	if err := t.skipWhitespace(); err != nil {
@@ -49,7 +69,7 @@ func (t *Tokenizer) Next() token.Token {
 
 	pos = t.pos()
 
-	r, err := t.peekRune()
+	r, err := t.runes.Peek()
 	if err != nil {
 		if err == io.EOF {
 			return token.EOFToken(pos)
@@ -59,16 +79,16 @@ func (t *Tokenizer) Next() token.Token {
 
 	switch r {
 	case '(':
-		t.consumeRune()
+		t.runes.Consume()
 		return token.LeftParenToken(pos)
 	case ')':
-		t.consumeRune()
+		t.runes.Consume()
 		return token.RightParenToken(pos)
 	case '\\':
-		t.consumeRune()
+		t.runes.Consume()
 		return token.LambdaToken(pos)
 	case '.':
-		t.consumeRune()
+		t.runes.Consume()
 		return token.DotToken(pos)
 	default:
 		if unicode.IsLetter(r) || r == '_' {
@@ -79,48 +99,19 @@ func (t *Tokenizer) Next() token.Token {
 			return token.IdentifierToken(value, pos)
 		}
 
-		t.consumeRune()
+		t.runes.Consume()
 		return token.InvalidToken(string(r), pos)
 	}
 }
 
 func (t *Tokenizer) pos() token.Position {
-	return token.Position{Line: t.line, Column: t.column}
-}
-
-func (t *Tokenizer) peekRune() (rune, error) {
-	if t.current.ready {
-		return t.current.rune, nil
-	}
-
-	r, _, err := t.reader.ReadRune()
-	if err != nil {
-		return 0, err
-	}
-
-	t.current.ready = true
-	t.current.rune = r
-	return r, nil
-}
-
-func (t *Tokenizer) consumeRune() {
-	if !t.current.ready {
-		return
-	}
-
-	if t.current.rune == '\n' {
-		t.line++
-		t.column = 0
-	} else {
-		t.column++
-	}
-
-	t.current.ready = false
+	pos := t.runes.Pos()
+	return token.Position{Line: pos.Line, Column: pos.Column}
 }
 
 func (t *Tokenizer) skipWhitespace() error {
 	for {
-		r, err := t.peekRune()
+		r, err := t.runes.Peek()
 		if err != nil {
 			return err
 		}
@@ -129,7 +120,7 @@ func (t *Tokenizer) skipWhitespace() error {
 			break
 		}
 
-		t.consumeRune()
+		t.runes.Consume()
 	}
 	return nil
 }
@@ -138,7 +129,7 @@ func (t *Tokenizer) readIdentifier() (string, error) {
 	var result []rune
 
 	for {
-		r, err := t.peekRune()
+		r, err := t.runes.Peek()
 		if err == io.EOF {
 			break
 		}
@@ -151,7 +142,7 @@ func (t *Tokenizer) readIdentifier() (string, error) {
 		}
 
 		result = append(result, r)
-		t.consumeRune()
+		t.runes.Consume()
 	}
 
 	return string(result), nil
