@@ -9,22 +9,14 @@ import (
 )
 
 type Tokenizer struct {
-	runes   *runes_reader.RunesReader
-	current struct {
-		ready bool
-		token token.Token
-	}
-}
-
-type currentToken struct {
-	ready bool
-	token token.Token
+	runes  *runes_reader.RunesReader
+	buffer []token.Token
 }
 
 func New(r io.Reader) *Tokenizer {
 	return &Tokenizer{
-		runes:   runes_reader.New(r),
-		current: currentToken{ready: false},
+		runes:  runes_reader.New(r),
+		buffer: make([]token.Token, 0, 1),
 	}
 }
 
@@ -41,24 +33,21 @@ func (t *Tokenizer) Each(action func(token token.Token) error) error {
 
 func (t *Tokenizer) Next() token.Token {
 	tok := t.Peek()
-	t.current = currentToken{ready: false}
+	t.buffer = t.buffer[:0]
 	return tok
 }
 
 func (t *Tokenizer) Peek() token.Token {
-	if t.current.ready {
-		return t.current.token
+	if len(t.buffer) > 0 {
+		return t.buffer[0]
 	}
 	tok := t.nextFromRunes()
-	t.current = currentToken{
-		ready: true,
-		token: tok,
-	}
+	t.buffer = append(t.buffer, tok)
 	return tok
 }
 
 func (t *Tokenizer) nextFromRunes() token.Token {
-	pos := t.pos()
+	pos := t.runes.Pos()
 
 	if err := t.skipWhitespace(); err != nil {
 		if err == io.EOF {
@@ -67,7 +56,7 @@ func (t *Tokenizer) nextFromRunes() token.Token {
 		return token.InvalidToken(err.Error(), pos)
 	}
 
-	pos = t.pos()
+	pos = t.runes.Pos()
 
 	r, err := t.runes.Peek()
 	if err != nil {
@@ -102,11 +91,6 @@ func (t *Tokenizer) nextFromRunes() token.Token {
 		t.runes.Consume()
 		return token.InvalidToken(string(r), pos)
 	}
-}
-
-func (t *Tokenizer) pos() token.Position {
-	pos := t.runes.Pos()
-	return token.Position{Line: pos.Line, Column: pos.Column}
 }
 
 func (t *Tokenizer) skipWhitespace() error {

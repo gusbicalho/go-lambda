@@ -1,5 +1,11 @@
 package token
 
+import (
+	"fmt"
+
+	"github.com/gusbicalho/go-lambda/position"
+)
+
 type TokenType int
 
 const (
@@ -33,45 +39,44 @@ func (t TokenType) String() string {
 	}
 }
 
-type Position struct {
-	Line   uint
-	Column uint
-}
-
 type Token struct {
 	tokenType TokenType
 	Value     string
-	Position  Position
+	Position  position.Position
+}
+
+func (t Token) String() string {
+	return fmt.Sprint(t.Type(), " at ", t.Position.Line, ":", t.Position.Column)
 }
 
 func (t Token) Type() TokenType {
 	return t.tokenType
 }
 
-func InvalidToken(reason string, pos Position) Token {
+func InvalidToken(reason string, pos position.Position) Token {
 	return Token{tokenType: Invalid, Value: reason, Position: pos}
 }
 
-func EOFToken(pos Position) Token {
+func EOFToken(pos position.Position) Token {
 	return Token{tokenType: EOF, Value: "", Position: pos}
 }
 
-func LeftParenToken(pos Position) Token {
+func LeftParenToken(pos position.Position) Token {
 	return Token{tokenType: LeftParen, Value: "(", Position: pos}
 }
 
-func RightParenToken(pos Position) Token {
+func RightParenToken(pos position.Position) Token {
 	return Token{tokenType: RightParen, Value: ")", Position: pos}
 }
 
-func LambdaToken(pos Position) Token {
+func LambdaToken(pos position.Position) Token {
 	return Token{tokenType: Lambda, Value: "\\", Position: pos}
 }
 
-func DotToken(pos Position) Token {
+func DotToken(pos position.Position) Token {
 	return Token{tokenType: Dot, Value: ".", Position: pos}
 }
 
-func IdentifierToken(name string, pos Position) Token {
+func IdentifierToken(name string, pos position.Position) Token {
 	return Token{tokenType: Identifier, Value: name, Position: pos}
 }

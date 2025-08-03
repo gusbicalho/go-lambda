@@ -3,33 +3,30 @@ package runes_reader
 import (
 	"bufio"
 	"io"
+
+	"github.com/gusbicalho/go-lambda/position"
 )
 
 type RunesReader struct {
 	reader      *bufio.Reader
-	pos         Position
+	pos         position.Position
 	currentRune struct {
 		ready bool
 		rune  rune
 	}
 }
 
-type Position struct {
-	Line   uint
-	Column uint
-}
-
 func New(r io.Reader) *RunesReader {
 	return &RunesReader{
 		reader: bufio.NewReader(r),
-		pos: Position{
+		pos: position.Position{
 			Line:   1,
 			Column: 0,
 		},
 	}
 }
 
-func (t *RunesReader) Pos() Position {
+func (t *RunesReader) Pos() position.Position {
 	return t.pos
 }
 

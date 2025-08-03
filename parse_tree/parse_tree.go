@@ -1,21 +1,20 @@
 package parse_tree
 
+import (
+	"fmt"
+	"strings"
+
+	"github.com/gusbicalho/go-lambda/position"
+	"github.com/gusbicalho/go-lambda/pretty"
+)
+
 type ParseTree struct {
-	InputRange InputRange
-	Item       ParseItem
-}
-
-type InputRange struct {
-	From InputLocation
-	To   InputLocation
-}
-
-type InputLocation struct {
-	Line   uint64
-	Column uint64
+	InputLocation position.Position
+	Item          ParseItem
 }
 
 type ParseItem interface {
+	pretty.Pretty
 	sealed()
 }
 
@@ -25,22 +24,52 @@ type Parens struct {
 
 func (v Parens) sealed() {}
 
+func (item Parens) ToPrettyDoc() pretty.PrettyDoc {
+	return pretty.Sequence(
+		pretty.FromString("("),
+		pretty.Indent(2, item.Child.ToPrettyDoc()),
+		pretty.FromString(")"),
+	)
+}
+
 type Var struct {
 	Name string
 }
 
 func (v Var) sealed() {}
 
+func (item Var) ToPrettyDoc() pretty.PrettyDoc {
+	return pretty.FromString(item.Name)
+}
+
 type Lambda struct {
 	ArgName string
-	Body    []ParseTree
+	Body    ParseTree
 }
 
 func (v Lambda) sealed() {}
+func (item Lambda) ToPrettyDoc() pretty.PrettyDoc {
+	return pretty.Sequence(
+		pretty.FromString(fmt.Sprint("\\", item.ArgName, ".")),
+		pretty.Indent(2, item.Body.ToPrettyDoc()),
+	)
+}
 
 type App struct {
-	Fun  ParseTree
-	Args []AppArgs
+	Callee ParseTree
+	Args   AppArgs
+}
+
+func (item App) ToPrettyDoc() pretty.PrettyDoc {
+	firstArg := item.Args.First.ToPrettyDoc()
+	moreArgs := make([]pretty.PrettyDoc, 0, len(item.Args.More))
+	for _, arg := range item.Args.More {
+		moreArgs = append(moreArgs, arg.ToPrettyDoc())
+	}
+	return pretty.Sequence(
+		item.Callee.ToPrettyDoc(),
+		pretty.Indent(2, pretty.Sequence(firstArg, moreArgs...)),
+	)
 }
 
 func (v App) sealed() {}
@@ -50,22 +79,9 @@ type AppArgs struct {
 	More  []ParseTree
 }
 
-func Case[r any](item ParseItem,
-	onParens func(item Parens) (r, error),
-	onVar func(item Var) (r, error),
-	onLambda func(item Lambda) (r, error),
-	onApp func(item App) (r, error),
-) (r, error) {
-	switch item := item.(type) {
-	case Parens:
-		return onParens(item)
-	case Var:
-		return onVar(item)
-	case Lambda:
-		return onLambda(item)
-	case App:
-		return onApp(item)
-	default:
-		panic("Impossible")
-	}
+func (t ParseTree) ToPrettyDoc() pretty.PrettyDoc {
+	return t.Item.ToPrettyDoc()
+}
+func (t ParseTree) String() string {
+	return strings.Join(t.ToPrettyDoc().ToLines(0), "\n")
 }
