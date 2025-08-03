@@ -26,6 +26,17 @@ func New(r io.Reader) *Tokenizer {
 	}
 }
 
+func (t *Tokenizer) Each(action func(token token.Token) error) error {
+	for tok := t.Next(); ; tok = t.Next() {
+		if err := action(tok); err != nil {
+			return err
+		}
+		if tok.Type() == token.EOF {
+			return nil
+		}
+	}
+}
+
 func (t *Tokenizer) Next() token.Token {
 	pos := t.pos()
 
