@@ -17,8 +17,8 @@ type Expr interface {
 
 type FreeVar struct{ name string }
 
-func NewFree(name string) Expr { return FreeVar{name} }
-func (v FreeVar) Name() string { return v.name }
+func NewFree(name string) FreeVar { return FreeVar{name} }
+func (v FreeVar) Name() string    { return v.name }
 
 func (FreeVar) sealed() {}
 func (v FreeVar) ToPrettyDoc(_ stack.Stack[string]) pretty.PrettyDoc {
@@ -27,8 +27,8 @@ func (v FreeVar) ToPrettyDoc(_ stack.Stack[string]) pretty.PrettyDoc {
 
 type BoundVar struct{ index uint }
 
-func NewBound(index uint) Expr { return BoundVar{index} }
-func (v BoundVar) Index() uint { return v.index }
+func NewBound(index uint) BoundVar { return BoundVar{index} }
+func (v BoundVar) Index() uint     { return v.index }
 
 func (BoundVar) sealed() {}
 func (v BoundVar) ToPrettyDoc(bound stack.Stack[string]) pretty.PrettyDoc {
@@ -43,15 +43,19 @@ type Lambda struct {
 	body    Expr
 }
 
-func NewLambda(argName string, body Expr) Expr { return Lambda{argName, body} }
-func (v Lambda) ArgName() string               { return v.argName }
-func (v Lambda) Body() Expr                    { return v.body }
+func NewLambda(argName string, body Expr) Lambda { return Lambda{argName, body} }
+func (v Lambda) ArgName() string                 { return v.argName }
+func (v Lambda) Body() Expr                      { return v.body }
 
 func (Lambda) sealed() {}
 func (item Lambda) ToPrettyDoc(ctx stack.Stack[string]) pretty.PrettyDoc {
+	nameLength := uint(len(item.argName))
 	return pretty.Sequence(
-		pretty.FromString(fmt.Sprint("\\", item.argName, ".")),
-		pretty.Indent(2, item.body.ToPrettyDoc(ctx.Push(item.argName))),
+		pretty.FromString(fmt.Sprint("\\", item.argName, "{")),
+		pretty.Indent(nameLength+1, pretty.PrefixLines(". ",
+			item.body.ToPrettyDoc(ctx.Push(item.argName)),
+		)),
+		pretty.Indent(nameLength+1, pretty.FromString("}")),
 	)
 }
 
@@ -60,9 +64,9 @@ type App struct {
 	arg    Expr
 }
 
-func NewApp(callee, arg Expr) Expr { return App{callee, arg} }
-func (v App) Callee() Expr         { return v.callee }
-func (v App) Arg() Expr            { return v.arg }
+func NewApp(callee, arg Expr) App { return App{callee, arg} }
+func (v App) Callee() Expr        { return v.callee }
+func (v App) Arg() Expr           { return v.arg }
 
 func (App) sealed() {}
 func (item App) ToPrettyDoc(ctx stack.Stack[string]) pretty.PrettyDoc {

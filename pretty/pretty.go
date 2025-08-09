@@ -11,19 +11,15 @@ type Pretty[context any] interface {
 type PrettyDoc struct{ impl prettyDocImpl }
 
 func (d PrettyDoc) String() string {
-	return strings.Join(d.toLines(0), "\n")
+	return strings.Join(d.toLines(noPrefix), "\n")
 }
 
-func (d PrettyDoc) ToLines(indent uint) []string {
-	return d.impl.toLines(indent)
-}
-
-func (d PrettyDoc) toLines(indent uint) []string {
-	return d.impl.toLines(indent)
+func (d PrettyDoc) toLines(writePrefix func(*strings.Builder)) []string {
+	return d.impl.toLines(writePrefix)
 }
 
 type prettyDocImpl interface {
-	toLines(indent uint) []string
+	toLines(writePrefix func(*strings.Builder)) []string
 }
 
 func FromString(s string) PrettyDoc {
@@ -46,6 +42,10 @@ func Indent(indent uint, doc PrettyDoc) PrettyDoc {
 	return PrettyDoc{indentDoc{indent: indent, item: doc}}
 }
 
+func PrefixLines(prefix string, doc PrettyDoc) PrettyDoc {
+	return PrettyDoc{linePrefixDoc{prefix: prefix, item: doc}}
+}
+
 func Sequence(doc PrettyDoc, moreDocs ...PrettyDoc) PrettyDoc {
 	if len(moreDocs) == 0 {
 		return doc
@@ -62,12 +62,9 @@ type lineDoc struct {
 	line string
 }
 
-func (s lineDoc) toLines(indent uint) []string {
+func (s lineDoc) toLines(writePrefix func(*strings.Builder)) []string {
 	builder := strings.Builder{}
-	builder.Grow(int(indent) + len([]byte(s.line)))
-	for i := uint(0); i < indent; i++ {
-		builder.WriteString(" ")
-	}
+	writePrefix(&builder)
 	builder.WriteString(s.line)
 	return []string{builder.String()}
 }
@@ -77,18 +74,42 @@ type indentDoc struct {
 	item   prettyDocImpl
 }
 
-func (i indentDoc) toLines(indent uint) []string {
-	return i.item.toLines(indent + i.indent)
+func (i indentDoc) toLines(writePrefix func(*strings.Builder)) []string {
+	return i.item.toLines(func(builder *strings.Builder) {
+		writePrefix(builder)
+		writeIndent(builder, i.indent)
+	})
+}
+
+type linePrefixDoc struct {
+	prefix string
+	item   prettyDocImpl
+}
+
+func (d linePrefixDoc) toLines(writePrefix func(*strings.Builder)) []string {
+	return d.item.toLines(func(builder *strings.Builder) {
+		writePrefix(builder)
+		builder.WriteString(d.prefix)
+	})
 }
 
 type sequenceDoc struct {
 	items []prettyDocImpl
 }
 
-func (seq sequenceDoc) toLines(indent uint) []string {
+func (seq sequenceDoc) toLines(writePrefix func(*strings.Builder)) []string {
 	lines := make([]string, 0, len(seq.items))
 	for i := 0; i < len(seq.items); i++ {
-		lines = append(lines, seq.items[i].toLines(indent)...)
+		lines = append(lines, seq.items[i].toLines(writePrefix)...)
 	}
 	return lines
+}
+
+func noPrefix(_ *strings.Builder) {}
+
+func writeIndent(builder *strings.Builder, indent uint) {
+	builder.Grow(int(indent))
+	for i := uint(0); i < indent; i++ {
+		builder.WriteString(" ")
+	}
 }
