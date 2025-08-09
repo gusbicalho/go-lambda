@@ -51,11 +51,11 @@ func (Lambda) sealed() {}
 func (item Lambda) ToPrettyDoc(ctx stack.Stack[string]) pretty.PrettyDoc {
 	nameLength := uint(len(item.argName))
 	return pretty.Sequence(
-		pretty.FromString(fmt.Sprint("\\", item.argName, "{")),
-		pretty.Indent(nameLength+1, pretty.PrefixLines(". ",
+		pretty.FromString(fmt.Sprint("λ", item.argName, " ─┬─")),
+		pretty.Indent(nameLength+1, pretty.PrefixLines([]string{"  │ "},
 			item.body.ToPrettyDoc(ctx.Push(item.argName)),
 		)),
-		pretty.Indent(nameLength+1, pretty.FromString("}")),
+		pretty.Indent(nameLength+1, pretty.FromString("  ╰─")),
 	)
 }
 
@@ -70,8 +70,12 @@ func (v App) Arg() Expr           { return v.arg }
 
 func (App) sealed() {}
 func (item App) ToPrettyDoc(ctx stack.Stack[string]) pretty.PrettyDoc {
+
 	return pretty.Sequence(
 		item.callee.ToPrettyDoc(ctx),
-		pretty.Indent(2, item.arg.ToPrettyDoc(ctx)),
+		pretty.PrefixLines([]string{
+			"└► ",
+			"   ",
+		}, item.arg.ToPrettyDoc(ctx)),
 	)
 }

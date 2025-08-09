@@ -2,6 +2,7 @@ package pretty
 
 import (
 	"strings"
+	"unicode/utf8"
 )
 
 type Pretty[context any] interface {
@@ -42,8 +43,43 @@ func Indent(indent uint, doc PrettyDoc) PrettyDoc {
 	return PrettyDoc{indentDoc{indent: indent, item: doc}}
 }
 
-func PrefixLines(prefix string, doc PrettyDoc) PrettyDoc {
-	return PrettyDoc{linePrefixDoc{prefix: prefix, item: doc}}
+func PrefixLines(prefixes []string, doc PrettyDoc) PrettyDoc {
+	prefixes = padPrefixes(prefixes)
+	if len(prefixes) == 0 {
+		return doc
+	}
+	return PrettyDoc{linePrefixDoc{prefixes: prefixes, item: doc}}
+}
+
+func padPrefixes(prefixes []string) []string {
+	if len(prefixes) == 0 {
+		return nil
+	}
+	maxLen := 0
+	for _, prefix := range prefixes {
+		if prefixLen := utf8.RuneCountInString(prefix); prefixLen > maxLen {
+			maxLen = prefixLen
+		}
+	}
+	pad := func(prefix string) string {
+		prefixLen := utf8.RuneCountInString(prefix)
+		if prefixLen == maxLen {
+			return prefix
+		}
+
+		builder := strings.Builder{}
+		builder.WriteString(prefix)
+
+		for runesToAdd := maxLen - prefixLen; runesToAdd > 0; runesToAdd-- {
+			builder.WriteString(" ")
+		}
+		return builder.String()
+	}
+	prefixesCopy := make([]string, 0, len(prefixes))
+	for _, prefix := range prefixes {
+		prefixesCopy = append(prefixesCopy, pad(prefix))
+	}
+	return prefixesCopy
 }
 
 func Sequence(doc PrettyDoc, moreDocs ...PrettyDoc) PrettyDoc {
@@ -82,14 +118,21 @@ func (i indentDoc) toLines(writePrefix func(*strings.Builder)) []string {
 }
 
 type linePrefixDoc struct {
-	prefix string
-	item   prettyDocImpl
+	prefixes []string
+	item     prettyDocImpl
 }
 
 func (d linePrefixDoc) toLines(writePrefix func(*strings.Builder)) []string {
+	line := 0
+	lastPrefix := d.prefixes[len(d.prefixes)-1]
 	return d.item.toLines(func(builder *strings.Builder) {
 		writePrefix(builder)
-		builder.WriteString(d.prefix)
+		if line < len(d.prefixes) {
+			builder.WriteString(d.prefixes[line])
+		} else {
+			builder.WriteString(lastPrefix)
+		}
+		line++
 	})
 }
 
