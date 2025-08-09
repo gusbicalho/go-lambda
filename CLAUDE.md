@@ -7,33 +7,51 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 This is a Go project implementing a lambda calculus parser and evaluator. The codebase consists of:
 
 - **Module**: `github.com/gusbicalho/go-lambda`
-- **Go Version**: 1.24.5 (managed via mise tool configuration)
-- **Architecture**: Simple two-package structure with main entry point and parse tree definitions
+- **Go Version**: 1.24 (managed via mise tool configuration)
+- **Architecture**: Multi-package modular structure with complete parsing pipeline
 
 ## Code Architecture
 
 ### Package Structure
 
-- `main` package: Entry point (currently empty main function)
-- `parse_tree` package: Core data structures for lambda calculus AST
+- `main` package: Complete parser implementation with recursive descent parsing logic
+- `parse_tree` package: AST definitions with sealed union types and pretty printing
+- `tokenizer` package: Lexical analysis with peek/consume interface
+- `token` package: Token types and constructors for lambda calculus syntax
+- `position` package: Source location tracking (line/column positions)
+- `runes_reader` package: Unicode-aware input reader with position tracking
+- `pretty` package: Pretty printing system for formatted output
+
+### Parser Architecture
+
+The parser is implemented as a recursive descent parser with these key components:
+
+1. **Tokenization Pipeline**: `RunesReader` → `Tokenizer` → `Token` stream
+2. **Parse Tree Construction**: Tokens are parsed into a typed AST
+3. **Pretty Printing**: AST nodes implement `Pretty` interface for formatted output
 
 ### Core Types
 
-The `parse_tree` package defines a sealed union type system for lambda calculus expressions:
-
-- `ParseTree`: Root structure containing `InputRange` and `ParseItem`
+#### Parse Tree (`parse_tree` package)
+- `ParseTree`: Root structure containing `InputLocation` and `ParseItem`
 - `ParseItem`: Sealed interface with four implementations:
   - `Var`: Variables with name
-  - `Lambda`: Lambda expressions with argument name and body
-  - `App`: Function applications with function and arguments
-  - `Parens`: Parenthesized expressions
-- `Case` function: Generic pattern matching over `ParseItem` types
+  - `Lambda`: Lambda expressions with argument name and body (`\x.body`)
+  - `App`: Function applications with callee and arguments
+  - `Parens`: Parenthesized expressions for grouping
+- All types implement `Pretty` interface for consistent output formatting
 
-### Input Tracking
+#### Tokenizer (`tokenizer` package)
+- `Tokenizer`: Main lexer with buffered peek/consume interface
+- Supports lambda calculus syntax: `\`, `.`, `(`, `)`, identifiers
+- Handles whitespace skipping and identifier recognition
+- Built on `RunesReader` for Unicode-aware parsing with position tracking
 
-The parser tracks source location information:
-- `InputRange`: Spans from one location to another
-- `InputLocation`: Line/column position in source
+#### Parsing Strategy
+The parser uses a `ParseResult[T]` monad pattern for error handling:
+- Tracks whether input was consumed (for better error recovery)
+- Implements left-associative function application parsing
+- Handles precedence through separate parsing functions for different syntactic categories
 
 ## Common Commands
 
@@ -46,11 +64,13 @@ go build
 ```bash
 go run .
 ```
+The main program reads lambda calculus expressions from stdin and outputs the parsed AST with pretty formatting.
 
 ### Testing
 ```bash
 go test ./...
 ```
+Note: Currently no test files exist in the project.
 
 ### Module Management
 ```bash
