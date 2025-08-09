@@ -2,7 +2,6 @@ package parse_tree
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/gusbicalho/go-lambda/position"
 	"github.com/gusbicalho/go-lambda/pretty"
@@ -14,7 +13,7 @@ type ParseTree struct {
 }
 
 type ParseItem interface {
-	pretty.Pretty
+	pretty.Pretty[any]
 	sealed()
 }
 
@@ -24,10 +23,10 @@ type Parens struct {
 
 func (v Parens) sealed() {}
 
-func (item Parens) ToPrettyDoc() pretty.PrettyDoc {
+func (item Parens) ToPrettyDoc(ctx any) pretty.PrettyDoc {
 	return pretty.Sequence(
 		pretty.FromString("("),
-		pretty.Indent(2, item.Child.ToPrettyDoc()),
+		pretty.Indent(2, item.Child.ToPrettyDoc(ctx)),
 		pretty.FromString(")"),
 	)
 }
@@ -38,7 +37,7 @@ type Var struct {
 
 func (v Var) sealed() {}
 
-func (item Var) ToPrettyDoc() pretty.PrettyDoc {
+func (item Var) ToPrettyDoc(ctx any) pretty.PrettyDoc {
 	return pretty.FromString(item.Name)
 }
 
@@ -48,10 +47,10 @@ type Lambda struct {
 }
 
 func (v Lambda) sealed() {}
-func (item Lambda) ToPrettyDoc() pretty.PrettyDoc {
+func (item Lambda) ToPrettyDoc(ctx any) pretty.PrettyDoc {
 	return pretty.Sequence(
 		pretty.FromString(fmt.Sprint("\\", item.ArgName, ".")),
-		pretty.Indent(2, item.Body.ToPrettyDoc()),
+		pretty.Indent(2, item.Body.ToPrettyDoc(ctx)),
 	)
 }
 
@@ -60,14 +59,14 @@ type App struct {
 	Args   AppArgs
 }
 
-func (item App) ToPrettyDoc() pretty.PrettyDoc {
-	firstArg := item.Args.First.ToPrettyDoc()
+func (item App) ToPrettyDoc(ctx any) pretty.PrettyDoc {
+	firstArg := item.Args.First.ToPrettyDoc(ctx)
 	moreArgs := make([]pretty.PrettyDoc, 0, len(item.Args.More))
 	for _, arg := range item.Args.More {
-		moreArgs = append(moreArgs, arg.ToPrettyDoc())
+		moreArgs = append(moreArgs, arg.ToPrettyDoc(ctx))
 	}
 	return pretty.Sequence(
-		item.Callee.ToPrettyDoc(),
+		item.Callee.ToPrettyDoc(ctx),
 		pretty.Indent(2, pretty.Sequence(firstArg, moreArgs...)),
 	)
 }
@@ -79,9 +78,9 @@ type AppArgs struct {
 	More  []ParseTree
 }
 
-func (t ParseTree) ToPrettyDoc() pretty.PrettyDoc {
-	return t.Item.ToPrettyDoc()
+func (t ParseTree) ToPrettyDoc(ctx any) pretty.PrettyDoc {
+	return t.Item.ToPrettyDoc(ctx)
 }
 func (t ParseTree) String() string {
-	return strings.Join(t.ToPrettyDoc().ToLines(0), "\n")
+	return t.ToPrettyDoc(nil).String()
 }
