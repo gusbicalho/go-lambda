@@ -1,173 +1,19 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"os"
 
-	"github.com/gusbicalho/go-lambda/parse_tree"
-	"github.com/gusbicalho/go-lambda/token"
+	"github.com/gusbicalho/go-lambda/parser"
 	"github.com/gusbicalho/go-lambda/tokenizer"
 )
 
 func main() {
 	tokenizer := tokenizer.New(os.Stdin)
-	tree := parseTree(tokenizer)
-	if tree.error != nil {
-		fmt.Println(tree.error.Error())
+	tree, err := parser.Parse(tokenizer)
+	if err != nil {
+		fmt.Println(err.Error())
 	} else {
-		fmt.Println(tree.value.String())
-	}
-	fmt.Println("Leftovers:")
-	tokenizer.Each(func(tok token.Token) error {
-		switch tok.Type() {
-		case token.EOF:
-		case token.Invalid:
-			fmt.Printf("ERROR at %d:%d: %s\n", tok.Position.Line, tok.Position.Column, tok.Value)
-		default:
-			fmt.Printf("%s: %q at %d:%d\n", tok.Type(), tok.Value, tok.Position.Line, tok.Position.Column)
-		}
-		return nil
-	})
-}
-
-type ParseResult[v any] struct {
-	value            v
-	hasConsumedInput bool
-	error            error
-}
-
-func (r ParseResult[v]) consumedInput() ParseResult[v] {
-	r.hasConsumedInput = true
-	return r
-}
-
-func parseTree(tokenizer *tokenizer.Tokenizer) ParseResult[parse_tree.ParseTree] {
-	calleeResult := parseApplicable(tokenizer)
-	if calleeResult.error != nil {
-		return calleeResult
-	}
-	return parsePossibleApp(tokenizer, calleeResult.value)
-}
-
-func parseApplicable(tokenizer *tokenizer.Tokenizer) ParseResult[parse_tree.ParseTree] {
-	tok := tokenizer.Peek()
-	switch tok.Type() {
-	case token.Lambda:
-		tokenizer.Next()
-		return parseLambda(tokenizer, tok).consumedInput()
-	case token.Identifier:
-		tokenizer.Next()
-		callee := parse_tree.ParseTree{
-			InputLocation: tok.Position,
-			Item:          parse_tree.Var{Name: tok.Value},
-		}
-		return ParseResult[parse_tree.ParseTree]{value: callee, hasConsumedInput: true}
-	case token.LeftParen:
-		tokenizer.Next()
-		calleeResult := parseParenTree(tokenizer, tok)
-		if calleeResult.error != nil {
-			return calleeResult.consumedInput()
-		}
-		return ParseResult[parse_tree.ParseTree]{value: calleeResult.value, hasConsumedInput: true}
-
-	default:
-		return ParseResult[parse_tree.ParseTree]{error: errors.New(fmt.Sprint("Unexpected token ", tok))}
-	}
-}
-
-func parseParenTree(tokenizer *tokenizer.Tokenizer, leftParen token.Token) ParseResult[parse_tree.ParseTree] {
-	child := parseTree(tokenizer)
-	if child.error != nil {
-		return child.consumedInput()
-	}
-	nextTok := tokenizer.Next()
-	if nextTok.Type() == token.RightParen {
-		return ParseResult[parse_tree.ParseTree]{
-			value: parse_tree.ParseTree{
-				InputLocation: leftParen.Position,
-				Item: parse_tree.Parens{
-					Child: child.value,
-				},
-			},
-			hasConsumedInput: true,
-		}
-	}
-	return ParseResult[parse_tree.ParseTree]{error: errors.New(fmt.Sprint("Expected ), found ", nextTok))}
-}
-
-func parsePossibleApp(tokenizer *tokenizer.Tokenizer, callee parse_tree.ParseTree) ParseResult[parse_tree.ParseTree] {
-	result := parseArgs(tokenizer)
-	if len(result.value) == 0 {
-		return ParseResult[parse_tree.ParseTree]{
-			value:            callee,
-			hasConsumedInput: result.hasConsumedInput,
-			error:            result.error,
-		}
-	} else {
-		app := parse_tree.ParseTree{
-			InputLocation: callee.InputLocation,
-			Item: parse_tree.App{
-				Callee: callee,
-				Args: parse_tree.AppArgs{
-					First: result.value[0],
-					More:  result.value[1:],
-				},
-			},
-		}
-		return ParseResult[parse_tree.ParseTree]{
-			value:            app,
-			hasConsumedInput: result.hasConsumedInput,
-			error:            result.error,
-		}
-	}
-}
-
-func parseArgs(tokenizer *tokenizer.Tokenizer) ParseResult[[]parse_tree.ParseTree] {
-	trees := []parse_tree.ParseTree{}
-	hasConsumedInput := false
-	for {
-		result := parseApplicable(tokenizer)
-		if result.hasConsumedInput {
-			hasConsumedInput = true
-		}
-		if result.error != nil {
-			if result.hasConsumedInput {
-				return ParseResult[[]parse_tree.ParseTree]{
-					hasConsumedInput: true,
-					error:            result.error,
-				}
-			}
-			return ParseResult[[]parse_tree.ParseTree]{
-				value:            trees,
-				hasConsumedInput: hasConsumedInput,
-				error:            nil,
-			}
-		}
-		trees = append(trees, result.value)
-	}
-}
-
-func parseLambda(tokenizer *tokenizer.Tokenizer, lambdaTok token.Token) ParseResult[parse_tree.ParseTree] {
-	argNameTok := tokenizer.Next()
-	if argNameTok.Type() != token.Identifier {
-		return ParseResult[parse_tree.ParseTree]{error: errors.New(fmt.Sprint("Expected identifier, found ", argNameTok))}
-	}
-	dotTok := tokenizer.Next()
-	if dotTok.Type() != token.Dot {
-		return ParseResult[parse_tree.ParseTree]{error: errors.New(fmt.Sprint("Expected ., found ", dotTok))}
-	}
-	bodyResult := parseTree(tokenizer)
-	if bodyResult.error != nil {
-		return bodyResult
-	}
-	return ParseResult[parse_tree.ParseTree]{
-		value: parse_tree.ParseTree{
-			InputLocation: lambdaTok.Position,
-			Item: parse_tree.Lambda{
-				ArgName: argNameTok.Value,
-				Body:    bodyResult.value,
-			},
-		},
+		fmt.Println(tree.String())
 	}
 }

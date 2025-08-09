@@ -14,7 +14,8 @@ This is a Go project implementing a lambda calculus parser and evaluator. The co
 
 ### Package Structure
 
-- `main` package: Complete parser implementation with recursive descent parsing logic
+- `main` package: Entry point that orchestrates tokenization and parsing
+- `parser` package: Complete recursive descent parser implementation with error handling
 - `parse_tree` package: AST definitions with sealed union types and pretty printing
 - `tokenizer` package: Lexical analysis with peek/consume interface
 - `token` package: Token types and constructors for lambda calculus syntax
@@ -47,11 +48,14 @@ The parser is implemented as a recursive descent parser with these key component
 - Handles whitespace skipping and identifier recognition
 - Built on `RunesReader` for Unicode-aware parsing with position tracking
 
-#### Parsing Strategy
-The parser uses a `ParseResult[T]` monad pattern for error handling:
-- Tracks whether input was consumed (for better error recovery)
-- Implements left-associative function application parsing
-- Handles precedence through separate parsing functions for different syntactic categories
+#### Parser Implementation (`parser` package)
+- `Parse(tokenizer)` function: Main entry point that ensures complete input consumption
+- `ParseResult[T]` monad pattern for error handling:
+  - Tracks whether input was consumed (for better error recovery)
+  - Implements left-associative function application parsing
+  - Handles precedence through separate parsing functions for different syntactic categories
+- Uses pointer semantics (`*parse_tree.ParseTree`) for efficient memory management
+- Validates complete input consumption and rejects leftover tokens
 
 ## Common Commands
 
