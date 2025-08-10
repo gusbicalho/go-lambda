@@ -4,21 +4,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Go project implementing a lambda calculus parser and evaluator. The codebase consists of:
+This is a Go project implementing a complete lambda calculus interpreter with parsing, conversion to locally nameless representation, and step-by-step beta reduction evaluation. The codebase consists of:
 
 - **Module**: `github.com/gusbicalho/go-lambda`
 - **Go Version**: 1.24 (managed via mise tool configuration)
-- **Architecture**: Multi-package modular structure with complete parsing pipeline
+- **Architecture**: Multi-package modular structure with complete parsing and evaluation pipeline
 
 ## Code Architecture
 
 ### Package Structure
 
-- `main` package: Entry point that orchestrates parsing and locally nameless conversion
+- `main` package: Entry point that orchestrates parsing, conversion, and interactive evaluation
 - `parser` package: Complete recursive descent parser implementation with error handling
 - `parse_tree` package: AST definitions with sealed union types and pretty printing
 - `parse_tree_to_locally_nameless` package: Conversion logic from named to De Bruijn representation
-- `locally_nameless` package: De Bruijn index representation for lambda expressions
+- `locally_nameless` package: De Bruijn index representation and beta reduction implementation
+- `lazy` package: Lazy evaluation utilities for efficient beta reduction
 - `stack` package: Functional stack data structure with iterator support
 - `tokenizer` package: Lexical analysis with peek/consume interface
 - `token` package: Token types and constructors for lambda calculus syntax
@@ -33,7 +34,8 @@ The system implements a complete lambda calculus interpreter with these key comp
 1. **Tokenization Pipeline**: `RunesReader` → `Tokenizer` → `Token` stream
 2. **Parse Tree Construction**: Tokens are parsed into a named AST representation
 3. **Locally Nameless Conversion**: Named variables converted to De Bruijn indices
-4. **Context-Aware Pretty Printing**: AST nodes implement `Pretty[context]` interface
+4. **Beta Reduction Evaluation**: Step-by-step lambda calculus evaluation with interactive stepping
+5. **Context-Aware Pretty Printing**: AST nodes implement `Pretty[context]` interface
 
 ### Core Types
 
@@ -47,13 +49,21 @@ The system implements a complete lambda calculus interpreter with these key comp
 - All types implement `Pretty[any]` interface for context-aware formatting
 
 #### Locally Nameless (`locally_nameless` package)
-Implementation of the locally nameless representation using De Bruijn indices:
+Implementation of the locally nameless representation using De Bruijn indices with beta reduction:
 - `Expr`: Sealed interface for lambda expressions without name capture issues
 - `FreeVar`: Free variables represented by their original names
 - `BoundVar`: Bound variables represented by De Bruijn indices (distance to binder)
 - `Lambda`: Lambda abstraction with original parameter name for display
 - `App`: Binary function application
+- `BetaReduce()`: Performs beta reduction by substitution with proper De Bruijn index shifting
 - All types implement `Pretty[Stack[string]]` for context-aware display with bound variable names
+
+#### Lazy Evaluation (`lazy` package)
+- `Lazy[T]`: Lazy evaluation wrapper for efficient computation deferral
+- `New()`: Creates lazy computation from function
+- `Wrap()`: Wraps already-computed value
+- `Get()`: Forces evaluation and caches result
+- Used in beta reduction to avoid unnecessary computation during substitution
 
 #### Stack Data Structure (`stack` package)
 - `Stack[T]`: Immutable functional stack with generic type parameter
@@ -94,11 +104,19 @@ go build
 
 ### Running
 ```bash
-go run .
+go run . "<lambda-expression>"
 ```
-The main program reads lambda calculus expressions from stdin and outputs both:
+The main program takes a lambda calculus expression as a command-line argument and provides:
 1. The original parse tree with named variables
-2. The locally nameless representation with De Bruijn indices
+2. The locally nameless representation with De Bruijn indices  
+3. Interactive step-by-step beta reduction evaluation
+
+#### Interactive Evaluation
+After displaying the parse tree and locally nameless form, the program enters interactive mode where:
+- Each reduction step is shown
+- Press Enter to proceed to the next step
+- Evaluation continues until the expression is in normal form (irreducible)
+- Supports both call-by-name and call-by-value evaluation strategies
 
 ### Testing
 ```bash
