@@ -1,6 +1,7 @@
 package pretty
 
 import (
+	"slices"
 	"strings"
 	"unicode/utf8"
 )
@@ -12,15 +13,15 @@ type Pretty[context any] interface {
 type PrettyDoc struct{ impl prettyDocImpl }
 
 func (d PrettyDoc) String() string {
-	return strings.Join(d.toLines(noPrefix), "\n")
+	return strings.Join(d.toLines(writeNothing, writeNothing), "\n")
 }
 
-func (d PrettyDoc) toLines(writePrefix func(*strings.Builder)) []string {
-	return d.impl.toLines(writePrefix)
+func (d PrettyDoc) toLines(writePrefix func(*strings.Builder), writeSuffix func(*strings.Builder)) []string {
+	return d.impl.toLines(writePrefix, writeSuffix)
 }
 
 type prettyDocImpl interface {
-	toLines(writePrefix func(*strings.Builder)) []string
+	toLines(writePrefix func(*strings.Builder), writeSuffix func(*strings.Builder)) []string
 }
 
 func FromString(s string) PrettyDoc {
@@ -41,6 +42,14 @@ func FromString(s string) PrettyDoc {
 
 func Indent(indent uint, doc PrettyDoc) PrettyDoc {
 	return PrettyDoc{indentDoc{indent: indent, item: doc}}
+}
+
+func (doc PrettyDoc) SuffixLines(suffixes []string) PrettyDoc {
+	if len(suffixes) == 0 {
+		return doc
+	}
+	suffixes = slices.Clone(suffixes)
+	return PrettyDoc{lineSuffixDoc{suffixes: suffixes, item: doc}}
 }
 
 func PrefixLines(prefixes []string, doc PrettyDoc) PrettyDoc {
@@ -98,10 +107,11 @@ type lineDoc struct {
 	line string
 }
 
-func (s lineDoc) toLines(writePrefix func(*strings.Builder)) []string {
+func (s lineDoc) toLines(writePrefix func(*strings.Builder), writeSuffix func(*strings.Builder)) []string {
 	builder := strings.Builder{}
 	writePrefix(&builder)
 	builder.WriteString(s.line)
+	writeSuffix(&builder)
 	return []string{builder.String()}
 }
 
@@ -110,11 +120,11 @@ type indentDoc struct {
 	item   prettyDocImpl
 }
 
-func (i indentDoc) toLines(writePrefix func(*strings.Builder)) []string {
+func (i indentDoc) toLines(writePrefix func(*strings.Builder), writeSuffix func(*strings.Builder)) []string {
 	return i.item.toLines(func(builder *strings.Builder) {
 		writePrefix(builder)
 		writeIndent(builder, i.indent)
-	})
+	}, writeSuffix)
 }
 
 type linePrefixDoc struct {
@@ -122,33 +132,58 @@ type linePrefixDoc struct {
 	item     prettyDocImpl
 }
 
-func (d linePrefixDoc) toLines(writePrefix func(*strings.Builder)) []string {
+func (d linePrefixDoc) toLines(writePrefix func(*strings.Builder), writeSuffix func(*strings.Builder)) []string {
 	line := 0
 	lastPrefix := d.prefixes[len(d.prefixes)-1]
-	return d.item.toLines(func(builder *strings.Builder) {
-		writePrefix(builder)
-		if line < len(d.prefixes) {
-			builder.WriteString(d.prefixes[line])
-		} else {
-			builder.WriteString(lastPrefix)
-		}
-		line++
-	})
+	return d.item.toLines(
+		func(builder *strings.Builder) {
+			writePrefix(builder)
+			if line < len(d.prefixes) {
+				builder.WriteString(d.prefixes[line])
+			} else {
+				builder.WriteString(lastPrefix)
+			}
+			line++
+		},
+		writeSuffix,
+	)
+}
+
+type lineSuffixDoc struct {
+	suffixes []string
+	item     prettyDocImpl
+}
+
+func (d lineSuffixDoc) toLines(writePrefix func(*strings.Builder), writeSuffix func(*strings.Builder)) []string {
+	line := 0
+	lastSuffix := d.suffixes[len(d.suffixes)-1]
+	return d.item.toLines(
+		writePrefix,
+		func(builder *strings.Builder) {
+			writePrefix(builder)
+			if line < len(d.suffixes) {
+				builder.WriteString(d.suffixes[line])
+			} else {
+				builder.WriteString(lastSuffix)
+			}
+			line++
+		},
+	)
 }
 
 type sequenceDoc struct {
 	items []prettyDocImpl
 }
 
-func (seq sequenceDoc) toLines(writePrefix func(*strings.Builder)) []string {
+func (seq sequenceDoc) toLines(writePrefix func(*strings.Builder), writeSuffix func(*strings.Builder)) []string {
 	lines := make([]string, 0, len(seq.items))
 	for i := 0; i < len(seq.items); i++ {
-		lines = append(lines, seq.items[i].toLines(writePrefix)...)
+		lines = append(lines, seq.items[i].toLines(writePrefix, writeSuffix)...)
 	}
 	return lines
 }
 
-func noPrefix(_ *strings.Builder) {}
+func writeNothing(_ *strings.Builder) {}
 
 func writeIndent(builder *strings.Builder, indent uint) {
 	builder.Grow(int(indent))

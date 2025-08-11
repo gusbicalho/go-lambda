@@ -247,7 +247,7 @@ func TestBetaReduce_ArgumentWithSameStructure(t *testing.T) {
 }
 
 // Test Case 16: BoundVar as Argument
-// Context: \y. (\x. x) y, Lambda: \x. x, Arg: y (BoundVar), Expected: y (same BoundVar)
+// DisplayContext: \y. (\x. x) y, Lambda: \x. x, Arg: y (BoundVar), Expected: y (same BoundVar)
 func TestBetaReduce_BoundVarAsArgument(t *testing.T) {
 	// \x. x (De Bruijn: \. 0)
 	lambda := NewLambda("x", NewBound(0)) // y as BoundVar (index 0 - referring to outer lambda in context)
