@@ -14,8 +14,7 @@ import (
 
 func main() {
 	source := os.Args[1]
-	tokenizer := tokenizer.New(strings.NewReader(source))
-	parseTree, err := parser.Parse(tokenizer)
+	parseTree, err := parser.Parse(tokenizer.New(strings.NewReader(source)))
 	if err != nil {
 		fmt.Println(err.Error())
 		return

@@ -12,6 +12,13 @@ type ParseTree struct {
 	Item          ParseItem
 }
 
+func (t ParseTree) ToPrettyDoc(ctx any) pretty.Doc {
+	return t.Item.ToPrettyDoc(ctx)
+}
+func (t ParseTree) String() string {
+	return t.ToPrettyDoc(nil).String()
+}
+
 type ParseItem interface {
 	pretty.Pretty[any]
 	sealed()
@@ -21,9 +28,9 @@ type Parens struct {
 	Child ParseTree
 }
 
-func (v Parens) sealed() {}
+func (Parens) sealed() {}
 
-func (item Parens) ToPrettyDoc(ctx any) pretty.PrettyDoc {
+func (item Parens) ToPrettyDoc(ctx any) pretty.Doc {
 	return pretty.Sequence(
 		pretty.FromString("("),
 		pretty.Indent(2, item.Child.ToPrettyDoc(ctx)),
@@ -35,9 +42,9 @@ type Var struct {
 	Name string
 }
 
-func (v Var) sealed() {}
+func (Var) sealed() {}
 
-func (item Var) ToPrettyDoc(ctx any) pretty.PrettyDoc {
+func (item Var) ToPrettyDoc(_ any) pretty.Doc {
 	return pretty.FromString(item.Name)
 }
 
@@ -46,8 +53,8 @@ type Lambda struct {
 	Body    ParseTree
 }
 
-func (v Lambda) sealed() {}
-func (item Lambda) ToPrettyDoc(ctx any) pretty.PrettyDoc {
+func (Lambda) sealed() {}
+func (item Lambda) ToPrettyDoc(ctx any) pretty.Doc {
 	return pretty.Sequence(
 		pretty.FromString(fmt.Sprint("\\", item.ArgName, ".")),
 		pretty.Indent(2, item.Body.ToPrettyDoc(ctx)),
@@ -59,9 +66,10 @@ type App struct {
 	Args   AppArgs
 }
 
-func (item App) ToPrettyDoc(ctx any) pretty.PrettyDoc {
+func (App) sealed() {}
+func (item App) ToPrettyDoc(ctx any) pretty.Doc {
 	firstArg := item.Args.First.ToPrettyDoc(ctx)
-	moreArgs := make([]pretty.PrettyDoc, 0, len(item.Args.More))
+	moreArgs := make([]pretty.Doc, 0, len(item.Args.More))
 	for _, arg := range item.Args.More {
 		moreArgs = append(moreArgs, arg.ToPrettyDoc(ctx))
 	}
@@ -71,16 +79,7 @@ func (item App) ToPrettyDoc(ctx any) pretty.PrettyDoc {
 	)
 }
 
-func (v App) sealed() {}
-
 type AppArgs struct {
 	First ParseTree
 	More  []ParseTree
-}
-
-func (t ParseTree) ToPrettyDoc(ctx any) pretty.PrettyDoc {
-	return t.Item.ToPrettyDoc(ctx)
-}
-func (t ParseTree) String() string {
-	return t.ToPrettyDoc(nil).String()
 }

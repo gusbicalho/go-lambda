@@ -11,17 +11,19 @@ func ToPrettyString(expr Expr) string {
 	return expr.ToPrettyDoc(EmptyContext()).String()
 }
 
-func (expr FreeVar) ToPrettyDoc(_ DisplayContext) pretty.PrettyDoc {
+func (expr FreeVar) ToPrettyDoc(_ DisplayContext) pretty.Doc {
 	return pretty.FromString(expr.name)
 }
 
-func (expr BoundVar) ToPrettyDoc(ctx DisplayContext) pretty.PrettyDoc {
+func (expr BoundVar) ToPrettyDoc(ctx DisplayContext) pretty.Doc {
 	builder := strings.Builder{}
-	expr.writeAsNotation(ctx, &builder)
+	if err := expr.writeLambdaNotation(ctx, &builder); err != nil {
+		panic(err)
+	}
 	return pretty.FromString(builder.String())
 }
 
-func (expr Lambda) ToPrettyDoc(ctx DisplayContext) pretty.PrettyDoc {
+func (expr Lambda) ToPrettyDoc(ctx DisplayContext) pretty.Doc {
 	ctx, argName := ctx.bindFree(expr.argName)
 	nameLength := uint(len(argName))
 	return pretty.Sequence(
@@ -33,7 +35,7 @@ func (expr Lambda) ToPrettyDoc(ctx DisplayContext) pretty.PrettyDoc {
 	)
 }
 
-func (expr App) ToPrettyDoc(ctx DisplayContext) pretty.PrettyDoc {
+func (expr App) ToPrettyDoc(ctx DisplayContext) pretty.Doc {
 	return pretty.Sequence(
 		expr.callee.ToPrettyDoc(ctx),
 		pretty.PrefixLines([]string{

@@ -1,63 +1,54 @@
 package pretty
 
 import (
-	"slices"
 	"strings"
 	"unicode/utf8"
 )
 
 type Pretty[context any] interface {
-	ToPrettyDoc(context context) PrettyDoc
+	ToPrettyDoc(context context) Doc
 }
 
-type PrettyDoc struct{ impl prettyDocImpl }
+type Doc struct{ impl prettyDocImpl }
 
-func (d PrettyDoc) String() string {
-	return strings.Join(d.toLines(writeNothing, writeNothing), "\n")
+func (doc Doc) String() string {
+	return strings.Join(doc.toLines(writeNothing, writeNothing), "\n")
 }
 
-func (d PrettyDoc) toLines(writePrefix func(*strings.Builder), writeSuffix func(*strings.Builder)) []string {
-	return d.impl.toLines(writePrefix, writeSuffix)
+func (doc Doc) toLines(writePrefix func(*strings.Builder), writeSuffix func(*strings.Builder)) []string {
+	return doc.impl.toLines(writePrefix, writeSuffix)
 }
 
 type prettyDocImpl interface {
 	toLines(writePrefix func(*strings.Builder), writeSuffix func(*strings.Builder)) []string
 }
 
-func FromString(s string) PrettyDoc {
+func FromString(s string) Doc {
 	lines := strings.Split(s, "\n")
 	switch len(lines) {
 	case 0:
-		return PrettyDoc{lineDoc{line: ""}}
+		return Doc{lineDoc{line: ""}}
 	case 1:
-		return PrettyDoc{lineDoc{line: lines[0]}}
+		return Doc{lineDoc{line: lines[0]}}
 	default:
 		lineDocs := make([]prettyDocImpl, 0, len(lines))
 		for i := 0; i < len(lines); i++ {
 			lineDocs = append(lineDocs, lineDoc{line: lines[i]})
 		}
-		return PrettyDoc{sequenceDoc{items: lineDocs}}
+		return Doc{sequenceDoc{items: lineDocs}}
 	}
 }
 
-func Indent(indent uint, doc PrettyDoc) PrettyDoc {
-	return PrettyDoc{indentDoc{indent: indent, item: doc}}
+func Indent(indent uint, doc Doc) Doc {
+	return Doc{indentDoc{indent: indent, item: doc}}
 }
 
-func (doc PrettyDoc) SuffixLines(suffixes []string) PrettyDoc {
-	if len(suffixes) == 0 {
-		return doc
-	}
-	suffixes = slices.Clone(suffixes)
-	return PrettyDoc{lineSuffixDoc{suffixes: suffixes, item: doc}}
-}
-
-func PrefixLines(prefixes []string, doc PrettyDoc) PrettyDoc {
+func PrefixLines(prefixes []string, doc Doc) Doc {
 	prefixes = padPrefixes(prefixes)
 	if len(prefixes) == 0 {
 		return doc
 	}
-	return PrettyDoc{linePrefixDoc{prefixes: prefixes, item: doc}}
+	return Doc{linePrefixDoc{prefixes: prefixes, item: doc}}
 }
 
 func padPrefixes(prefixes []string) []string {
@@ -91,7 +82,7 @@ func padPrefixes(prefixes []string) []string {
 	return prefixesCopy
 }
 
-func Sequence(doc PrettyDoc, moreDocs ...PrettyDoc) PrettyDoc {
+func Sequence(doc Doc, moreDocs ...Doc) Doc {
 	if len(moreDocs) == 0 {
 		return doc
 	}
@@ -100,7 +91,7 @@ func Sequence(doc PrettyDoc, moreDocs ...PrettyDoc) PrettyDoc {
 	for i, doc := range moreDocs {
 		items[i+1] = doc.impl
 	}
-	return PrettyDoc{sequenceDoc{items: items}}
+	return Doc{sequenceDoc{items: items}}
 }
 
 type lineDoc struct {
@@ -146,28 +137,6 @@ func (d linePrefixDoc) toLines(writePrefix func(*strings.Builder), writeSuffix f
 			line++
 		},
 		writeSuffix,
-	)
-}
-
-type lineSuffixDoc struct {
-	suffixes []string
-	item     prettyDocImpl
-}
-
-func (d lineSuffixDoc) toLines(writePrefix func(*strings.Builder), writeSuffix func(*strings.Builder)) []string {
-	line := 0
-	lastSuffix := d.suffixes[len(d.suffixes)-1]
-	return d.item.toLines(
-		writePrefix,
-		func(builder *strings.Builder) {
-			writePrefix(builder)
-			if line < len(d.suffixes) {
-				builder.WriteString(d.suffixes[line])
-			} else {
-				builder.WriteString(lastSuffix)
-			}
-			line++
-		},
 	)
 }
 

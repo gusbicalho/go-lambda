@@ -109,7 +109,7 @@ func parsePossibleApp(tokenizer *tokenizer.Tokenizer, callee parse_tree.ParseTre
 }
 
 func parseArgs(tokenizer *tokenizer.Tokenizer) ParseResult[[]parse_tree.ParseTree] {
-	trees := []parse_tree.ParseTree{}
+	trees := make([]parse_tree.ParseTree, 0)
 	hasConsumedInput := false
 	for {
 		result := parseApplicable(tokenizer)

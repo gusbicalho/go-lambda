@@ -6,10 +6,10 @@ import (
 	"github.com/gusbicalho/go-lambda/position"
 )
 
-type TokenType int
+type Type int
 
 const (
-	Invalid TokenType = iota
+	Invalid Type = iota
 	EOF
 	LeftParen
 	RightParen
@@ -18,7 +18,7 @@ const (
 	Identifier
 )
 
-func (t TokenType) String() string {
+func (t Type) String() string {
 	switch t {
 	case Invalid:
 		return "INVALID"
@@ -40,7 +40,7 @@ func (t TokenType) String() string {
 }
 
 type Token struct {
-	tokenType TokenType
+	tokenType Type
 	Value     string
 	Position  position.Position
 }
@@ -49,7 +49,7 @@ func (t Token) String() string {
 	return fmt.Sprint(t.Type(), " at ", t.Position.Line, ":", t.Position.Column)
 }
 
-func (t Token) Type() TokenType {
+func (t Token) Type() Type {
 	return t.tokenType
 }
 

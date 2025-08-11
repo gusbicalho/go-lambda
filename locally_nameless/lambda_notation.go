@@ -8,64 +8,96 @@ import (
 
 func ToLambdaNotation(expr Expr, displayBoundVarAs DisplayBoundVarAs) string {
 	builder := strings.Builder{}
-	expr.writeAsNotation(
+	err := expr.writeLambdaNotation(
 		EmptyContext().WithDisplayBoundVarAs(displayBoundVarAs),
 		&builder,
 	)
+	if err != nil {
+		panic(err)
+	}
 	return builder.String()
 }
-func (expr FreeVar) writeAsNotation(_ DisplayContext, writer io.StringWriter) {
-	writer.WriteString(expr.name)
+
+type asLambdaNotation interface {
+	writeLambdaNotation(ctx DisplayContext, writer io.StringWriter) error
 }
 
-func (expr BoundVar) writeAsNotation(ctx DisplayContext, writer io.StringWriter) {
+func writeStrings(writer io.StringWriter, strings ...string) error {
+	for _, str := range strings {
+		_, err := writer.WriteString(str)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (expr FreeVar) writeLambdaNotation(_ DisplayContext, writer io.StringWriter) error {
+	return writeStrings(writer, expr.name)
+}
+
+func (expr BoundVar) writeLambdaNotation(ctx DisplayContext, writer io.StringWriter) error {
 	switch ctx.displayBoundVarAs {
 	case DisplayIndex:
-		writer.WriteString(fmt.Sprint(expr.index))
-		return
+		return writeStrings(writer, fmt.Sprint(expr.index))
 	case DisplayName:
 		if name, found := ctx.bound.Nth(expr.index, ""); found {
-			writer.WriteString(name)
-			return
+			return writeStrings(writer, name)
 		}
 	case DisplayBoth:
 		if name, found := ctx.bound.Nth(expr.index, ""); found {
-			writer.WriteString(fmt.Sprint(expr.index))
-			writer.WriteString(":")
-			writer.WriteString(name)
-			return
+			return writeStrings(writer, fmt.Sprint(expr.index), ":", name)
 		}
 	}
-	writer.WriteString(fmt.Sprint(expr.index))
-	writer.WriteString(":<outofscope>")
+	return writeStrings(writer, fmt.Sprint(expr.index), ":<outofscope>")
 }
 
-func (expr Lambda) writeAsNotation(ctx DisplayContext, writer io.StringWriter) {
-	writer.WriteString("\\")
-
+func (expr Lambda) writeLambdaNotation(ctx DisplayContext, writer io.StringWriter) error {
 	ctx, argName := ctx.bindFree(expr.argName)
+	if err := writeStrings(writer, "\\", argName, ". "); err != nil {
+		return err
+	}
 
-	writer.WriteString(argName)
-	writer.WriteString(". ")
-	expr.body.writeAsNotation(ctx, writer)
+	return expr.body.writeLambdaNotation(ctx, writer)
 }
 
-func (expr App) writeAsNotation(ctx DisplayContext, writer io.StringWriter) {
+func (expr App) writeLambdaNotation(ctx DisplayContext, writer io.StringWriter) error {
 	switch callee := expr.callee.(type) {
 	case Lambda:
-		writer.WriteString("(")
-		callee.writeAsNotation(ctx, writer)
-		writer.WriteString(")")
+		if err := writeStrings(writer, "("); err != nil {
+			return err
+		}
+		if err := callee.writeLambdaNotation(ctx, writer); err != nil {
+			return err
+		}
+		if err := writeStrings(writer, ")"); err != nil {
+			return err
+		}
 	default:
-		callee.writeAsNotation(ctx, writer)
+		if err := callee.writeLambdaNotation(ctx, writer); err != nil {
+			return err
+		}
 	}
-	writer.WriteString(" ")
+
+	if err := writeStrings(writer, " "); err != nil {
+		return err
+	}
+
 	switch arg := expr.arg.(type) {
 	case App, Lambda:
-		writer.WriteString("(")
-		arg.writeAsNotation(ctx, writer)
-		writer.WriteString(")")
+		if err := writeStrings(writer, "("); err != nil {
+			return err
+		}
+		if err := arg.writeLambdaNotation(ctx, writer); err != nil {
+			return err
+		}
+		if err := writeStrings(writer, ")"); err != nil {
+			return err
+		}
 	default:
-		arg.writeAsNotation(ctx, writer)
+		if err := arg.writeLambdaNotation(ctx, writer); err != nil {
+			return err
+		}
 	}
+	return nil
 }

@@ -2,7 +2,6 @@ package locally_nameless
 
 import (
 	"github.com/gusbicalho/go-lambda/pretty"
-	"io"
 )
 
 // Represents an AST with strings for free variables
@@ -10,7 +9,7 @@ import (
 
 type Expr interface {
 	pretty.Pretty[DisplayContext]
-	writeAsNotation(ctx DisplayContext, writer io.StringWriter)
+	asLambdaNotation
 	sealed()
 }
 
