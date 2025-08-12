@@ -52,31 +52,8 @@ func betaReductions(
 }
 
 func betaReduceNext(expr locally_nameless.Expr, reduceUnderLambda bool) (locally_nameless.Expr, bool) {
-	switch expr := expr.(type) {
-	case locally_nameless.App:
-		switch callee := expr.Callee().(type) {
-		case locally_nameless.Lambda:
-			return locally_nameless.BetaReduce(callee, expr.Arg()), true
-		default:
-			callee, reduced := betaReduceNext(callee, reduceUnderLambda)
-			if reduced {
-				return locally_nameless.NewApp(callee, expr.Arg()), true
-			}
-			arg, reduced := betaReduceNext(expr.Arg(), reduceUnderLambda)
-			if reduced {
-				return locally_nameless.NewApp(expr.Callee(), arg), true
-			}
-			return expr, false
-		}
-	case locally_nameless.Lambda:
-		if reduceUnderLambda {
-			reducedBody, reduced := betaReduceNext(expr.Body(), reduceUnderLambda)
-			if reduced {
-				return locally_nameless.NewLambda(expr.ArgName(), reducedBody), true
-			}
-		}
-		return expr, false
-	default:
-		return expr, false
+	for locus := range locally_nameless.BetaReductionLocii(expr) {
+		return locus.Reduce(), true
 	}
+	return expr, false
 }

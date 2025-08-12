@@ -2,12 +2,52 @@ package locally_nameless
 
 import (
 	"fmt"
+	"iter"
 
 	"github.com/gusbicalho/go-lambda/lazy"
 )
 
 func BetaReduce(lambda Lambda, arg Expr) Expr {
 	return subst(lambda.body, lazy.Wrap(arg), 0)
+}
+
+type BetaReductionLocus struct {
+	Hole   Hole
+	Lambda Lambda
+	Arg    Expr
+}
+
+func (locus BetaReductionLocus) Reduce() Expr {
+	return locus.Hole.Fill(BetaReduce(locus.Lambda, locus.Arg))
+}
+
+type Hole struct {
+	fill func(expr Expr) Expr
+}
+
+func (h Hole) Fill(expr Expr) Expr {
+	return h.fill(expr)
+}
+
+func identityHole() Hole {
+	return Hole{fill: func(expr Expr) Expr { return expr }}
+}
+
+func composeHoles(hole Hole, holes ...Hole) Hole {
+	for _, h := range holes {
+		fillOuter := hole.fill
+		fillInner := h.fill
+		hole = Hole{fill: func(expr Expr) Expr {
+			return fillOuter(fillInner(expr))
+		}}
+	}
+	return hole
+}
+
+func BetaReductionLocii(expr Expr) iter.Seq[BetaReductionLocus] {
+	return func(yield func(BetaReductionLocus) bool) {
+		betaReductionLocii(yield, identityHole(), expr)
+	}
 }
 
 func subst(body Expr, arg lazy.Lazy[Expr], index uint) Expr {
@@ -62,4 +102,44 @@ func shift(expr Expr, underBinders uint) Expr {
 	default:
 		panic(fmt.Sprint("Unknown Expr ", expr))
 	}
+}
+
+func betaReductionLocii(yield func(BetaReductionLocus) bool, hole Hole, expr Expr) bool {
+	switch expr := expr.(type) {
+	case App:
+		switch callee := expr.callee.(type) {
+		case Lambda:
+			if !yield(BetaReductionLocus{
+				Hole:   hole,
+				Lambda: callee,
+				Arg:    expr.arg,
+			}) {
+				return false
+			}
+		}
+		return betaReductionLocii(yield, composeHoles(hole, expr.calleeHole()), expr.callee) &&
+			betaReductionLocii(yield, composeHoles(hole, expr.argHole()), expr.arg)
+	case Lambda:
+		return betaReductionLocii(
+			yield,
+			expr.hole(),
+			expr.body,
+		)
+	}
+	return true
+}
+
+func (expr Lambda) hole() Hole {
+	argName := expr.argName
+	return Hole{fill: func(expr Expr) Expr { return NewLambda(argName, expr) }}
+}
+
+func (expr App) calleeHole() Hole {
+	arg := expr.arg
+	return Hole{fill: func(e Expr) Expr { return NewApp(e, arg) }}
+}
+
+func (expr App) argHole() Hole {
+	callee := expr.callee
+	return Hole{fill: func(e Expr) Expr { return NewApp(callee, e) }}
 }
