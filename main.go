@@ -52,7 +52,7 @@ func betaReductions(
 }
 
 func betaReduceNext(expr locally_nameless.Expr, reduceUnderLambda bool) (locally_nameless.Expr, bool) {
-	for locus := range locally_nameless.BetaReductionLocii(expr) {
+	for locus := range locally_nameless.BetaRedexes(expr) {
 		return locus.Reduce(), true
 	}
 	return expr, false

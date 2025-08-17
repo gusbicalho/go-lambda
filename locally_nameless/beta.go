@@ -11,13 +11,13 @@ func BetaReduce(lambda Lambda, arg Expr) Expr {
 	return subst(lambda.body, lazy.Wrap(arg), 0)
 }
 
-type BetaReductionLocus struct {
+type BetaRedex struct {
 	Hole   Hole
 	Lambda Lambda
 	Arg    Expr
 }
 
-func (locus BetaReductionLocus) Reduce() Expr {
+func (locus BetaRedex) Reduce() Expr {
 	return locus.Hole.Fill(BetaReduce(locus.Lambda, locus.Arg))
 }
 
@@ -44,9 +44,9 @@ func composeHoles(hole Hole, holes ...Hole) Hole {
 	return hole
 }
 
-func BetaReductionLocii(expr Expr) iter.Seq[BetaReductionLocus] {
-	return func(yield func(BetaReductionLocus) bool) {
-		betaReductionLocii(yield, identityHole(), expr)
+func BetaRedexes(expr Expr) iter.Seq[BetaRedex] {
+	return func(yield func(BetaRedex) bool) {
+		betaRedexes(yield, identityHole(), expr)
 	}
 }
 
@@ -104,12 +104,12 @@ func shift(expr Expr, underBinders uint) Expr {
 	}
 }
 
-func betaReductionLocii(yield func(BetaReductionLocus) bool, hole Hole, expr Expr) bool {
+func betaRedexes(yield func(BetaRedex) bool, hole Hole, expr Expr) bool {
 	switch expr := expr.(type) {
 	case App:
 		switch callee := expr.callee.(type) {
 		case Lambda:
-			if !yield(BetaReductionLocus{
+			if !yield(BetaRedex{
 				Hole:   hole,
 				Lambda: callee,
 				Arg:    expr.arg,
@@ -117,10 +117,10 @@ func betaReductionLocii(yield func(BetaReductionLocus) bool, hole Hole, expr Exp
 				return false
 			}
 		}
-		return betaReductionLocii(yield, composeHoles(hole, expr.calleeHole()), expr.callee) &&
-			betaReductionLocii(yield, composeHoles(hole, expr.argHole()), expr.arg)
+		return betaRedexes(yield, composeHoles(hole, expr.calleeHole()), expr.callee) &&
+			betaRedexes(yield, composeHoles(hole, expr.argHole()), expr.arg)
 	case Lambda:
-		return betaReductionLocii(
+		return betaRedexes(
 			yield,
 			expr.hole(),
 			expr.body,
