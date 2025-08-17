@@ -5,6 +5,7 @@ import (
 	"iter"
 
 	"github.com/gusbicalho/go-lambda/lazy"
+	"github.com/gusbicalho/go-lambda/pretty"
 )
 
 func BetaReduce(lambda Lambda, arg Expr) Expr {
@@ -15,6 +16,12 @@ type BetaRedex struct {
 	Hole   Hole
 	Lambda Lambda
 	Arg    Expr
+}
+
+func (redex BetaRedex) ToPrettyDoc(_ any) pretty.Doc {
+	return HoleToPrettyDoc(redex.Hole, func(ctx DisplayContext) pretty.Doc {
+		return pretty.ForegroundColor(pretty.ColorYellow, NewApp(redex.Lambda, redex.Arg).ToPrettyDoc(ctx))
+	})
 }
 
 func (locus BetaRedex) Reduce() Expr {

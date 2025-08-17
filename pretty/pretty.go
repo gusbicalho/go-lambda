@@ -1,6 +1,7 @@
 package pretty
 
 import (
+	"io"
 	"strings"
 	"unicode/utf8"
 )
@@ -94,6 +95,51 @@ func Sequence(doc Doc, moreDocs ...Doc) Doc {
 	return Doc{sequenceDoc{items: items}}
 }
 
+func Bold(doc Doc) Doc {
+	return Doc{escapeCodesDoc{codes: "1", resets: "22", item: doc}}
+}
+
+func Italic(doc Doc) Doc {
+	return Doc{escapeCodesDoc{codes: "3", resets: "23", item: doc}}
+}
+
+const (
+	ColorBlack uint8 = iota
+	ColorRed
+	ColorGreen
+	ColorYellow
+	ColorBlue
+	ColorMagenta
+	ColorCyan
+	ColorWhite
+	ColorDefault
+)
+
+func ForegroundColor(color uint8, doc Doc) Doc {
+	var code string
+	switch color {
+	case 0:
+		code = "30"
+	case 1:
+		code = "31"
+	case 2:
+		code = "32"
+	case 3:
+		code = "33"
+	case 4:
+		code = "34"
+	case 5:
+		code = "35"
+	case 6:
+		code = "36"
+	case 7:
+		code = "37"
+	default:
+		return doc
+	}
+	return Doc{escapeCodesDoc{codes: code, resets: "39", item: doc}}
+}
+
 type lineDoc struct {
 	line string
 }
@@ -150,6 +196,34 @@ func (seq sequenceDoc) toLines(writePrefix func(*strings.Builder), writeSuffix f
 		lines = append(lines, seq.items[i].toLines(writePrefix, writeSuffix)...)
 	}
 	return lines
+}
+
+type escapeCodesDoc struct {
+	codes  string
+	resets string
+	item   prettyDocImpl
+}
+
+func (d escapeCodesDoc) toLines(writePrefix func(*strings.Builder), writeSuffix func(*strings.Builder)) []string {
+	return d.item.toLines(
+		func(builder *strings.Builder) {
+			writePrefix(builder)
+			writeEscapeCodes(builder, d.codes)
+		},
+		func(builder *strings.Builder) {
+			writeEscapeCodes(builder, d.resets)
+			writeSuffix(builder)
+		},
+	)
+}
+
+func writeEscapeCodes(builder io.StringWriter, codes string) {
+	if len(codes) == 0 {
+		return
+	}
+	builder.WriteString("\u001b[")
+	builder.WriteString(codes)
+	builder.WriteString("m")
 }
 
 func writeNothing(_ *strings.Builder) {}

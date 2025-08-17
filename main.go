@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"iter"
 	"os"
 	"strings"
 
@@ -20,40 +19,32 @@ func main() {
 		return
 	}
 
-	ast := parse_tree_to_locally_nameless.ToLocallyNameless(*parseTree)
+	expr := parse_tree_to_locally_nameless.ToLocallyNameless(*parseTree)
 
-	fmt.Println(locally_nameless.ToLambdaNotation(ast, locally_nameless.DisplayName))
-	fmt.Println(locally_nameless.ToPrettyString(ast))
+	fmt.Println(locally_nameless.ToLambdaNotation(expr, locally_nameless.DisplayName))
 
-	for expr := range betaReductions(ast, true) {
+	for {
+		redex := nextBetaRedex(expr)
+		if redex == nil {
+			fmt.Println(locally_nameless.ToPrettyString(expr))
+			fmt.Println("Irreducible.")
+			break
+		}
+		fmt.Println(redex.ToPrettyDoc(nil).String())
 		fmt.Print("Step? ")
 		_, err = fmt.Scanln()
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
+		expr = redex.Reduce()
 		fmt.Println(locally_nameless.ToLambdaNotation(expr, locally_nameless.DisplayName))
-		fmt.Println(locally_nameless.ToPrettyString(expr))
-	}
-	fmt.Println("Irreducible.")
-}
-
-func betaReductions(
-	expr locally_nameless.Expr,
-	reduceUnderLambda bool,
-) iter.Seq[locally_nameless.Expr] {
-	return func(yield func(locally_nameless.Expr) bool) {
-		for expr, reduced := betaReduceNext(expr, reduceUnderLambda); reduced; expr, reduced = betaReduceNext(expr, reduceUnderLambda) {
-			if !yield(expr) {
-				return
-			}
-		}
 	}
 }
 
-func betaReduceNext(expr locally_nameless.Expr, reduceUnderLambda bool) (locally_nameless.Expr, bool) {
-	for locus := range locally_nameless.BetaRedexes(expr) {
-		return locus.Reduce(), true
+func nextBetaRedex(expr locally_nameless.Expr) *locally_nameless.BetaRedex {
+	for redex := range locally_nameless.BetaRedexes(expr) {
+		return &redex
 	}
-	return expr, false
+	return nil
 }
