@@ -21,32 +21,9 @@ func (locus BetaRedex) Reduce() Expr {
 	return locus.Hole.Fill(BetaReduce(locus.Lambda, locus.Arg))
 }
 
-type Hole struct {
-	fill func(expr Expr) Expr
-}
-
-func (h Hole) Fill(expr Expr) Expr {
-	return h.fill(expr)
-}
-
-func identityHole() Hole {
-	return Hole{fill: func(expr Expr) Expr { return expr }}
-}
-
-func composeHoles(hole Hole, holes ...Hole) Hole {
-	for _, h := range holes {
-		fillOuter := hole.fill
-		fillInner := h.fill
-		hole = Hole{fill: func(expr Expr) Expr {
-			return fillOuter(fillInner(expr))
-		}}
-	}
-	return hole
-}
-
 func BetaRedexes(expr Expr) iter.Seq[BetaRedex] {
 	return func(yield func(BetaRedex) bool) {
-		betaRedexes(yield, identityHole(), expr)
+		betaRedexes(yield, IdentityHole(), expr)
 	}
 }
 
@@ -117,29 +94,14 @@ func betaRedexes(yield func(BetaRedex) bool, hole Hole, expr Expr) bool {
 				return false
 			}
 		}
-		return betaRedexes(yield, composeHoles(hole, expr.calleeHole()), expr.callee) &&
-			betaRedexes(yield, composeHoles(hole, expr.argHole()), expr.arg)
+		return betaRedexes(yield, ComposeHoles(hole, expr.CalleeHole()), expr.callee) &&
+			betaRedexes(yield, ComposeHoles(hole, expr.ArgHole()), expr.arg)
 	case Lambda:
 		return betaRedexes(
 			yield,
-			expr.hole(),
+			expr.Hole(),
 			expr.body,
 		)
 	}
 	return true
-}
-
-func (expr Lambda) hole() Hole {
-	argName := expr.argName
-	return Hole{fill: func(expr Expr) Expr { return NewLambda(argName, expr) }}
-}
-
-func (expr App) calleeHole() Hole {
-	arg := expr.arg
-	return Hole{fill: func(e Expr) Expr { return NewApp(e, arg) }}
-}
-
-func (expr App) argHole() Hole {
-	callee := expr.callee
-	return Hole{fill: func(e Expr) Expr { return NewApp(callee, e) }}
 }
