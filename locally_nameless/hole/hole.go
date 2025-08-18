@@ -41,9 +41,17 @@ func (h identityHole) toPrettyDoc(ctx ln.DisplayContext, fill func(ln.DisplayCon
 // Compose
 
 func ComposeHoles(holes ...Hole) Hole {
-	impls := make([]holeImpl, len(holes))
-	for i, hole := range holes {
-		impls[i] = hole.holeImpl
+	impls := make([]holeImpl, 0, len(holes))
+	for _, hole := range holes {
+		switch hole := hole.holeImpl.(type) {
+		case identityHole:
+			// Noop - identity holes can be skipped in composition
+		case composeHoles:
+			// We can flatten nested composeHoles
+			impls = append(impls, hole.holes...)
+		default:
+			impls = append(impls, hole)
+		}
 	}
 	return Hole{composeHoles{holes: impls}}
 }
