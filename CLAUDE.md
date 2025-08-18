@@ -18,7 +18,12 @@ This is a Go project implementing a complete lambda calculus interpreter with pa
 - `parser` package: Complete recursive descent parser implementation with error handling
 - `parse_tree` package: AST definitions with sealed union types and pretty printing
 - `parse_tree_to_locally_nameless` package: Conversion logic from named to De Bruijn representation
-- `locally_nameless` package: De Bruijn index representation and beta reduction implementation
+- `locally_nameless/` package group: De Bruijn index representation and evaluation
+  - `locally_nameless/expr/`: Core expression types, display context, and lambda notation formatting
+  - `locally_nameless/beta_reduce/`: Beta reduction implementation with substitution and shifting
+  - `locally_nameless/hole/`: Context tracking system for reduction visualization
+  - `locally_nameless/walk/`: AST traversal with hole-based context propagation
+  - `locally_nameless/pretty/`: Locally nameless-specific pretty printing
 - `lazy` package: Lazy evaluation utilities for efficient beta reduction
 - `stack` package: Functional stack data structure with iterator support
 - `tokenizer` package: Lexical analysis with peek/consume interface
@@ -48,15 +53,32 @@ The system implements a complete lambda calculus interpreter with these key comp
   - `Parens`: Parenthesized expressions for grouping
 - All types implement `Pretty[any]` interface for context-aware formatting
 
-#### Locally Nameless (`locally_nameless` package)
+#### Locally Nameless (`locally_nameless/` packages)
 Implementation of the locally nameless representation using De Bruijn indices with beta reduction:
+
+**Core Expression Types (`locally_nameless/expr/`):**
 - `Expr`: Sealed interface for lambda expressions without name capture issues
 - `FreeVar`: Free variables represented by their original names
 - `BoundVar`: Bound variables represented by De Bruijn indices (distance to binder)
 - `Lambda`: Lambda abstraction with original parameter name for display
 - `App`: Binary function application
+- `DisplayContext`: Context for variable name resolution with multiple display modes
+- `ToLambdaNotation()`: Converts expressions to readable lambda notation
+
+**Beta Reduction (`locally_nameless/beta_reduce/`):**
 - `BetaReduce()`: Performs beta reduction by substitution with proper De Bruijn index shifting
-- All types implement `Pretty[Stack[string]]` for context-aware display with bound variable names
+- `BetaRedex`: Represents a reducible application with hole context for visualization
+- `BetaRedexes()`: Iterator over all beta redexes in an expression
+- Substitution with lazy evaluation and proper variable shifting
+
+**Context System (`locally_nameless/hole/`):**
+- `Hole`: Represents a context (expression with a "hole") for tracking reduction locations
+- Identity, composition, lambda body, and application argument/callee holes
+- Pretty printing support with tree-like visualization using Unicode characters
+
+**AST Traversal (`locally_nameless/walk/`):**
+- `Pre()`: Pre-order traversal of expressions with hole context tracking
+- Used by beta reduction to find all reducible subexpressions
 
 #### Lazy Evaluation (`lazy` package)
 - `Lazy[T]`: Lazy evaluation wrapper for efficient computation deferral
@@ -108,15 +130,16 @@ go run . "<lambda-expression>"
 ```
 The main program takes a lambda calculus expression as a command-line argument and provides:
 1. The original parse tree with named variables
-2. The locally nameless representation with De Bruijn indices  
+2. The locally nameless representation with De Bruijn indices
 3. Interactive step-by-step beta reduction evaluation
 
 #### Interactive Evaluation
 After displaying the parse tree and locally nameless form, the program enters interactive mode where:
-- Each reduction step is shown
+- Each reduction step is shown with beta redexes highlighted in yellow
+- Tree-like visualization using Unicode characters shows the reduction context
 - Press Enter to proceed to the next step
 - Evaluation continues until the expression is in normal form (irreducible)
-- Supports both call-by-name and call-by-value evaluation strategies
+- Uses call-by-name evaluation strategy (leftmost-outermost reduction)
 
 ### Testing
 ```bash
