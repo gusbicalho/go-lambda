@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"strings"
@@ -14,7 +15,17 @@ import (
 )
 
 func main() {
-	source := os.Args[1]
+	var source string
+	if len(os.Args) > 1 {
+		source = os.Args[1]
+	} else {
+		reader := bufio.NewReader(os.Stdin)
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			panic(err)
+		}
+		source = line
+	}
 	parseTree, err := parser.Parse(tokenizer.New(strings.NewReader(source)))
 	if err != nil {
 		fmt.Println(err.Error())
