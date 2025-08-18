@@ -7,6 +7,7 @@ import (
 	"github.com/gusbicalho/go-lambda/locally_nameless/expr"
 	"github.com/gusbicalho/go-lambda/locally_nameless/hole"
 	ln_pretty "github.com/gusbicalho/go-lambda/locally_nameless/pretty"
+	"github.com/gusbicalho/go-lambda/locally_nameless/walk"
 	"github.com/gusbicalho/go-lambda/pretty"
 )
 
@@ -28,13 +29,33 @@ func (redex BetaRedex) ToPrettyDoc(_ any) pretty.Doc {
 	})
 }
 
+func AsBetaRedex(e expr.Expr) *BetaRedex {
+	if app, ok := e.(expr.App); ok {
+		if callee, ok := app.Callee().(expr.Lambda); ok {
+			return &BetaRedex{
+				Hole:   hole.IdentityHole(),
+				Lambda: callee,
+				Arg:    app.Arg(),
+			}
+		}
+	}
+	return nil
+}
+
 func (locus BetaRedex) Reduce() expr.Expr {
 	return locus.Hole.Fill(BetaReduce(locus.Lambda, locus.Arg))
 }
 
 func BetaRedexes(e expr.Expr) iter.Seq[BetaRedex] {
 	return func(yield func(BetaRedex) bool) {
-		betaRedexes(yield, hole.IdentityHole(), e)
+		for h, e := range walk.Pre(e) {
+			if redex := AsBetaRedex(e); redex != nil {
+				redex.Hole = hole.ComposeHoles(h, redex.Hole)
+				if !yield(*redex) {
+					return
+				}
+			}
+		}
 	}
 }
 
@@ -103,29 +124,4 @@ func (v shiftVisit) CaseApp(e expr.App) expr.Expr {
 }
 func (v shiftVisit) CaseLambda(e expr.Lambda) expr.Expr {
 	return expr.NewLambda(e.ArgName(), shift(e.Body(), v.underBinders+1))
-}
-
-func betaRedexes(yield func(BetaRedex) bool, h hole.Hole, e expr.Expr) bool {
-	switch e := e.(type) {
-	case expr.App:
-		switch callee := e.Callee().(type) {
-		case expr.Lambda:
-			if !yield(BetaRedex{
-				Hole:   h,
-				Lambda: callee,
-				Arg:    e.Arg(),
-			}) {
-				return false
-			}
-		}
-		return betaRedexes(yield, hole.ComposeHoles(h, hole.CalleeHole(e)), e.Callee()) &&
-			betaRedexes(yield, hole.ComposeHoles(h, hole.ArgHole(e)), e.Arg())
-	case expr.Lambda:
-		return betaRedexes(
-			yield,
-			hole.BodyHole(e),
-			e.Body(),
-		)
-	}
-	return true
 }
