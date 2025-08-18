@@ -1,4 +1,4 @@
-package locally_nameless
+package expr
 
 import (
 	"fmt"
@@ -36,6 +36,10 @@ func (expr FreeVar) writeLambdaNotation(_ DisplayContext, writer io.StringWriter
 	return writeStrings(writer, expr.name)
 }
 
+func (expr BoundVar) WriteLambdaNotation(ctx DisplayContext, writer io.StringWriter) error {
+	return expr.writeLambdaNotation(ctx, writer)
+}
+
 func (expr BoundVar) writeLambdaNotation(ctx DisplayContext, writer io.StringWriter) error {
 	switch ctx.displayBoundVarAs {
 	case DisplayIndex:
@@ -53,7 +57,7 @@ func (expr BoundVar) writeLambdaNotation(ctx DisplayContext, writer io.StringWri
 }
 
 func (expr Lambda) writeLambdaNotation(ctx DisplayContext, writer io.StringWriter) error {
-	ctx, argName := ctx.bindFree(expr.argName)
+	ctx, argName := ctx.BindFree(expr.argName)
 	if err := writeStrings(writer, "\\", argName, ". "); err != nil {
 		return err
 	}

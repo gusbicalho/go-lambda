@@ -1,16 +1,37 @@
-package locally_nameless
+package expr
 
 import (
-	"github.com/gusbicalho/go-lambda/pretty"
+	"fmt"
 )
 
 // Represents an AST with strings for free variables
 // and de Bruijn indexes for lambda params
 
 type Expr interface {
-	pretty.Pretty[DisplayContext]
 	asLambdaNotation
 	sealed()
+}
+
+type VisitExpr[R any] interface {
+	CaseFree(FreeVar) R
+	CaseBound(BoundVar) R
+	CaseLambda(Lambda) R
+	CaseApp(App) R
+}
+
+func CaseExpr[R any](expr Expr, visit VisitExpr[R]) R {
+	switch expr := expr.(type) {
+	case FreeVar:
+		return visit.CaseFree(expr)
+	case BoundVar:
+		return visit.CaseBound(expr)
+	case Lambda:
+		return visit.CaseLambda(expr)
+	case App:
+		return visit.CaseApp(expr)
+	default:
+		panic(fmt.Sprint("Unknown expr ", expr))
+	}
 }
 
 type FreeVar struct{ name string }

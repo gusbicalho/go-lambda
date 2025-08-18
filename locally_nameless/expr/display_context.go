@@ -1,7 +1,8 @@
-package locally_nameless
+package expr
 
 import (
 	"fmt"
+
 	"github.com/gusbicalho/go-lambda/stack"
 )
 
@@ -27,7 +28,7 @@ func (ctx DisplayContext) WithDisplayBoundVarAs(displayAs DisplayBoundVarAs) Dis
 	return ctx
 }
 
-func (ctx DisplayContext) bindFree(name string) (DisplayContext, string) {
+func (ctx DisplayContext) BindFree(name string) (DisplayContext, string) {
 	if ctx.isBound(name) {
 		for i := 0; ; i++ {
 			newName := fmt.Sprint(name, "_", i)
