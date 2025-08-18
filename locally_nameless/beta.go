@@ -19,7 +19,7 @@ type BetaRedex struct {
 }
 
 func (redex BetaRedex) ToPrettyDoc(_ any) pretty.Doc {
-	return HoleToPrettyDoc(redex.Hole, func(ctx DisplayContext) pretty.Doc {
+	return redex.Hole.ToPrettyDoc(func(ctx DisplayContext) pretty.Doc {
 		return pretty.ForegroundColor(pretty.ColorYellow, NewApp(redex.Lambda, redex.Arg).ToPrettyDoc(ctx))
 	})
 }

@@ -7,28 +7,23 @@ import (
 	"github.com/gusbicalho/go-lambda/pretty"
 )
 
-type Hole interface {
+type Hole struct {
+	holeImpl
+}
+
+func (h Hole) ToPrettyDoc(fill func(DisplayContext) pretty.Doc) pretty.Doc {
+	return h.holeImpl.toPrettyDoc(EmptyContext(), fill)
+}
+
+type holeImpl interface {
 	Fill(expr Expr) Expr
-	pretty.Pretty[displayHoleContext]
-}
-
-func HoleToPrettyDoc(hole Hole, fill func(DisplayContext) pretty.Doc) pretty.Doc {
-	return hole.ToPrettyDoc(displayHoleContext{EmptyContext(), fill})
-}
-
-func HoleToPrettyString(hole Hole, fill func(DisplayContext) pretty.Doc) string {
-	return HoleToPrettyDoc(hole, fill).String()
-}
-
-type displayHoleContext struct {
-	context DisplayContext
-	fill    func(DisplayContext) pretty.Doc
+	toPrettyDoc(ctx DisplayContext, fill func(DisplayContext) pretty.Doc) pretty.Doc
 }
 
 // Identity
 
 func IdentityHole() Hole {
-	return identityHole{}
+	return Hole{identityHole{}}
 }
 
 type identityHole struct{}
@@ -37,18 +32,22 @@ func (h identityHole) Fill(expr Expr) Expr {
 	return expr
 }
 
-func (h identityHole) ToPrettyDoc(displayCtx displayHoleContext) pretty.Doc {
-	return displayCtx.fill(displayCtx.context)
+func (h identityHole) toPrettyDoc(ctx DisplayContext, fill func(DisplayContext) pretty.Doc) pretty.Doc {
+	return fill(ctx)
 }
 
 // Compose
 
 func ComposeHoles(holes ...Hole) Hole {
-	return composeHoles{holes: holes}
+	impls := make([]holeImpl, len(holes))
+	for i, hole := range holes {
+		impls[i] = hole.holeImpl
+	}
+	return Hole{composeHoles{holes: impls}}
 }
 
 type composeHoles struct {
-	holes []Hole
+	holes []holeImpl
 }
 
 func (h composeHoles) Fill(expr Expr) Expr {
@@ -58,29 +57,29 @@ func (h composeHoles) Fill(expr Expr) Expr {
 	return expr
 }
 
-func (h composeHoles) ToPrettyDoc(displayHoleCtx displayHoleContext) pretty.Doc {
-	return composeToPrettyDoc(h.holes, displayHoleCtx.context, displayHoleCtx.fill)
+func (h composeHoles) toPrettyDoc(ctx DisplayContext, fill func(DisplayContext) pretty.Doc) pretty.Doc {
+	return composeToPrettyDoc(h.holes, ctx, fill)
 }
 
-func composeToPrettyDoc(holes []Hole, ctx DisplayContext, fill func(DisplayContext) pretty.Doc) pretty.Doc {
+func composeToPrettyDoc(holes []holeImpl, ctx DisplayContext, fill func(DisplayContext) pretty.Doc) pretty.Doc {
 	switch len(holes) {
 	case 0:
 		return fill(ctx)
 	case 1:
-		return holes[0].ToPrettyDoc(displayHoleContext{ctx, fill})
+		return holes[0].toPrettyDoc(ctx, fill)
 	}
 	hole := holes[0]
 	more := holes[1:]
 	fillMore := func(ctx DisplayContext) pretty.Doc {
 		return composeToPrettyDoc(more, ctx, fill)
 	}
-	return hole.ToPrettyDoc(displayHoleContext{ctx, fillMore})
+	return hole.toPrettyDoc(ctx, fillMore)
 }
 
 // Lambda
 
 func (expr Lambda) Hole() Hole {
-	return lambdaBodyHole{argName: expr.argName}
+	return Hole{lambdaBodyHole{argName: expr.argName}}
 }
 
 type lambdaBodyHole struct {
@@ -91,14 +90,13 @@ func (h lambdaBodyHole) Fill(expr Expr) Expr {
 	return NewLambda(h.argName, expr)
 }
 
-func (h lambdaBodyHole) ToPrettyDoc(displayHoleCtx displayHoleContext) pretty.Doc {
-	ctx := displayHoleCtx.context
+func (h lambdaBodyHole) toPrettyDoc(ctx DisplayContext, fill func(DisplayContext) pretty.Doc) pretty.Doc {
 	ctx, argName := ctx.bindFree(h.argName)
 	nameLength := uint(len(argName))
 	return pretty.Sequence(
 		pretty.FromString(fmt.Sprint("λ", argName, " ─┬─")),
 		pretty.Indent(nameLength+1, pretty.PrefixLines([]string{"  │ "},
-			displayHoleCtx.fill(ctx),
+			fill(ctx),
 		)),
 		pretty.Indent(nameLength+1, pretty.FromString("  ╰─")),
 	)
@@ -106,7 +104,7 @@ func (h lambdaBodyHole) ToPrettyDoc(displayHoleCtx displayHoleContext) pretty.Do
 
 // App: Callee
 func (expr App) CalleeHole() Hole {
-	return appCalleeHole{arg: expr.arg}
+	return Hole{appCalleeHole{arg: expr.arg}}
 }
 
 type appCalleeHole struct {
@@ -117,10 +115,9 @@ func (h appCalleeHole) Fill(expr Expr) Expr {
 	return NewApp(expr, h.arg)
 }
 
-func (h appCalleeHole) ToPrettyDoc(displayHoleCtx displayHoleContext) pretty.Doc {
-	ctx := displayHoleCtx.context
+func (h appCalleeHole) toPrettyDoc(ctx DisplayContext, fill func(DisplayContext) pretty.Doc) pretty.Doc {
 	return pretty.Sequence(
-		displayHoleCtx.fill(ctx),
+		fill(ctx),
 		pretty.PrefixLines([]string{
 			"└► ",
 			"   ",
@@ -130,7 +127,7 @@ func (h appCalleeHole) ToPrettyDoc(displayHoleCtx displayHoleContext) pretty.Doc
 
 // App: Arg
 func (expr App) ArgHole() Hole {
-	return appArgHole{callee: expr.callee}
+	return Hole{appArgHole{callee: expr.callee}}
 }
 
 type appArgHole struct {
@@ -141,13 +138,12 @@ func (h appArgHole) Fill(expr Expr) Expr {
 	return NewApp(h.callee, expr)
 }
 
-func (h appArgHole) ToPrettyDoc(displayHoleCtx displayHoleContext) pretty.Doc {
-	ctx := displayHoleCtx.context
+func (h appArgHole) toPrettyDoc(ctx DisplayContext, fill func(DisplayContext) pretty.Doc) pretty.Doc {
 	return pretty.Sequence(
 		h.callee.ToPrettyDoc(ctx),
 		pretty.PrefixLines([]string{
 			"└► ",
 			"   ",
-		}, displayHoleCtx.fill(ctx)),
+		}, fill(ctx)),
 	)
 }
