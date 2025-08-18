@@ -42,8 +42,8 @@ func AsBetaRedex(e expr.Expr) *BetaRedex {
 	return nil
 }
 
-func (locus BetaRedex) Reduce() expr.Expr {
-	return locus.Hole.Fill(BetaReduce(locus.Lambda, locus.Arg))
+func (redex BetaRedex) Reduce() expr.Expr {
+	return redex.Hole.Fill(BetaReduce(redex.Lambda, redex.Arg))
 }
 
 func BetaRedexes(e expr.Expr) iter.Seq[BetaRedex] {
