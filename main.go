@@ -3,15 +3,18 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"os"
-	"strings"
-
+	"github.com/gdamore/tcell/v2"
 	ln_beta_reduce "github.com/gusbicalho/go-lambda/locally_nameless/beta_reduce"
 	ln_expr "github.com/gusbicalho/go-lambda/locally_nameless/expr"
 	ln_pretty "github.com/gusbicalho/go-lambda/locally_nameless/pretty"
 	"github.com/gusbicalho/go-lambda/parse_tree_to_locally_nameless"
 	"github.com/gusbicalho/go-lambda/parser"
 	"github.com/gusbicalho/go-lambda/tokenizer"
+	"os"
+	"slices"
+	"strings"
+
+	"github.com/rivo/tview"
 )
 
 func main() {
@@ -35,7 +38,92 @@ func main() {
 
 	expr := parse_tree_to_locally_nameless.ToLocallyNameless(*parseTree)
 
-	run(expr)
+	tui(expr)
+	//run(expr)
+}
+
+func tui(expr ln_expr.Expr) {
+	app := tview.NewApplication()
+	textView := tview.NewTextView().
+		SetDynamicColors(true).
+		SetRegions(true).
+		SetChangedFunc(
+			func() {
+				app.Draw()
+			},
+		)
+
+	selectedRedexIndex := 0
+	redexes := slices.Collect(ln_beta_reduce.BetaRedexes(expr))
+
+	getSelectedRedex := func() *ln_beta_reduce.BetaRedex {
+		count := len(redexes)
+		if count <= 0 {
+			return nil
+		}
+		i := selectedRedexIndex % count
+		if i < 0 {
+			i += count
+		}
+		return &redexes[i]
+	}
+
+	reduce := func() {
+		if redex := getSelectedRedex(); redex != nil {
+			expr = redex.Reduce()
+			selectedRedexIndex = 0
+			redexes = slices.Collect(ln_beta_reduce.BetaRedexes(expr))
+		}
+	}
+
+	shift := func(change int) {
+		if len(redexes) <= 0 {
+			selectedRedexIndex = 0
+			return
+		}
+		selectedRedexIndex += change
+	}
+
+	redraw := func() {
+		var pretty string
+		if redex := getSelectedRedex(); redex != nil {
+			pretty = redex.ToPrettyDoc(nil).String()
+		} else {
+			pretty = ln_pretty.ToPrettyDoc(expr).String() + "\nIrreducible."
+		}
+
+		textView.Clear()
+		fmt.Fprintf(
+			textView, "%s\n\n%s",
+			ln_expr.ToLambdaNotation(expr, ln_expr.DisplayName),
+			pretty,
+		)
+	}
+	go redraw()
+
+	textView.SetDoneFunc(
+		func(key tcell.Key) {
+			if key == tcell.KeyEnter {
+				reduce()
+				redraw()
+			} else if len(redexes) > 0 {
+				switch key {
+				case tcell.KeyTab:
+					shift(1)
+					redraw()
+				case tcell.KeyBacktab:
+					shift(-1)
+					redraw()
+				default:
+				}
+			}
+		},
+	)
+
+	textView.SetBorder(true)
+	if err := app.SetRoot(textView, true).SetFocus(textView).Run(); err != nil {
+		panic(err)
+	}
 }
 
 func run(expr ln_expr.Expr) {
