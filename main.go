@@ -15,18 +15,18 @@ import (
 )
 
 func main() {
-	reader := bufio.NewReader(os.Stdin)
 
 	var source string
 	if len(os.Args) > 1 {
 		source = os.Args[1]
 	} else {
-		line, err := reader.ReadString('\n')
+		line, err := bufio.NewReader(os.Stdin).ReadString('\n')
 		if err != nil {
 			panic(err)
 		}
 		source = line
 	}
+
 	parseTree, err := parser.Parse(tokenizer.New(strings.NewReader(source)))
 	if err != nil {
 		fmt.Println(err.Error())
@@ -35,9 +35,14 @@ func main() {
 
 	expr := parse_tree_to_locally_nameless.ToLocallyNameless(*parseTree)
 
-	fmt.Println(ln_expr.ToLambdaNotation(expr, ln_expr.DisplayName))
+	run(expr)
+}
+
+func run(expr ln_expr.Expr) {
+	reader := bufio.NewReader(os.Stdin)
 
 	for {
+		fmt.Println(ln_expr.ToLambdaNotation(expr, ln_expr.DisplayName))
 		redex := nextBetaRedex(expr)
 		if redex == nil {
 			fmt.Println(ln_pretty.ToPrettyDoc(expr).String())
@@ -46,13 +51,12 @@ func main() {
 		}
 		fmt.Println(redex.ToPrettyDoc(nil).String())
 		fmt.Print("Step? ")
-		_, err = reader.ReadString('\n')
+		_, err := reader.ReadString('\n')
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
 		expr = redex.Reduce()
-		fmt.Println(ln_expr.ToLambdaNotation(expr, ln_expr.DisplayName))
 	}
 }
 
