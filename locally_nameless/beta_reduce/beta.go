@@ -50,7 +50,7 @@ func (redex BetaRedex) Reduce() expr.Expr {
 
 func BetaRedexes(e expr.Expr) iter.Seq[BetaRedex] {
 	return func(yield func(BetaRedex) bool) {
-		for h, e := range walk.Pre(e) {
+		for h, e := range walk.Post(e) {
 			if redex := AsBetaRedex(e); redex != nil {
 				redex.Hole = hole.ComposeHoles(h, redex.Hole)
 				if !yield(*redex) {
