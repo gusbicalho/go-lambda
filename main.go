@@ -52,6 +52,7 @@ func tui(expr ln_expr.Expr) {
 			},
 		)
 
+	log := []string{ln_expr.ToLambdaNotation(expr, ln_expr.DisplayName)}
 	selectedRedexIndex := 0
 	redexes := slices.Collect(ln_beta_reduce.BetaRedexes(expr))
 
@@ -70,10 +71,14 @@ func tui(expr ln_expr.Expr) {
 	step := func() {
 		if redex := getSelectedRedex(); redex != nil {
 			expr = redex.Reduce()
+			log = append(log, ln_expr.ToLambdaNotation(expr, ln_expr.DisplayName))
 			selectedRedexIndex = 0
 			redexes = slices.Collect(ln_beta_reduce.BetaRedexes(expr))
 		} else {
 			app.Stop()
+			for _, logEntry := range log {
+				fmt.Println(logEntry)
+			}
 		}
 	}
 
