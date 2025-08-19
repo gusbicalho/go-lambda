@@ -32,7 +32,11 @@ func (v preVisit) CaseFree(e expr.FreeVar) bool {
 
 func (v preVisit) CaseLambda(e expr.Lambda) bool {
 	return v.yield(v.hole, e) &&
-		prewalk(e.Body(), hole.BodyHole(e), v.yield)
+		prewalk(
+			e.Body(),
+			hole.ComposeHoles(v.hole, hole.BodyHole(e)),
+			v.yield,
+		)
 }
 
 func (v preVisit) CaseApp(e expr.App) bool {
