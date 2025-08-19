@@ -15,11 +15,12 @@ import (
 )
 
 func main() {
+	reader := bufio.NewReader(os.Stdin)
+
 	var source string
 	if len(os.Args) > 1 {
 		source = os.Args[1]
 	} else {
-		reader := bufio.NewReader(os.Stdin)
 		line, err := reader.ReadString('\n')
 		if err != nil {
 			panic(err)
@@ -45,7 +46,7 @@ func main() {
 		}
 		fmt.Println(redex.ToPrettyDoc(nil).String())
 		fmt.Print("Step? ")
-		_, err = fmt.Scanln()
+		_, err = reader.ReadString('\n')
 		if err != nil {
 			fmt.Println(err)
 			return
