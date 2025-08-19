@@ -67,11 +67,13 @@ func tui(expr ln_expr.Expr) {
 		return &redexes[i]
 	}
 
-	reduce := func() {
+	step := func() {
 		if redex := getSelectedRedex(); redex != nil {
 			expr = redex.Reduce()
 			selectedRedexIndex = 0
 			redexes = slices.Collect(ln_beta_reduce.BetaRedexes(expr))
+		} else {
+			app.Stop()
 		}
 	}
 
@@ -103,7 +105,7 @@ func tui(expr ln_expr.Expr) {
 	textView.SetDoneFunc(
 		func(key tcell.Key) {
 			if key == tcell.KeyEnter {
-				reduce()
+				step()
 				redraw()
 			} else if len(redexes) > 0 {
 				switch key {
