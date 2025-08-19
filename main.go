@@ -18,7 +18,6 @@ import (
 )
 
 func main() {
-
 	var source string
 	if len(os.Args) > 1 {
 		source = os.Args[1]

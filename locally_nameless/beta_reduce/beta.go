@@ -22,11 +22,13 @@ type BetaRedex struct {
 }
 
 func (redex BetaRedex) ToPrettyDoc(_ any) pretty.Doc {
-	return redex.Hole.ToPrettyDoc(func(ctx expr.DisplayContext) pretty.Doc {
-		return pretty.ForegroundColor(pretty.ColorYellow,
-			ln_pretty.ExprToPrettyDoc(expr.NewApp(redex.Lambda, redex.Arg), ctx),
-		)
-	})
+	return redex.Hole.ToPrettyDoc(
+		func(ctx expr.DisplayContext) pretty.Doc {
+			return pretty.TViewInvert(
+				ln_pretty.ExprToPrettyDoc(expr.NewApp(redex.Lambda, redex.Arg), ctx),
+			)
+		},
+	)
 }
 
 func AsBetaRedex(e expr.Expr) *BetaRedex {

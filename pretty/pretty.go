@@ -140,6 +140,10 @@ func ForegroundColor(color uint8, doc Doc) Doc {
 	return Doc{escapeCodesDoc{codes: code, resets: "39", item: doc}}
 }
 
+func TViewInvert(doc Doc) Doc {
+	return Doc{tviewStyleDoc{flags: "r", item: doc}}
+}
+
 type lineDoc struct {
 	line string
 }
@@ -158,10 +162,12 @@ type indentDoc struct {
 }
 
 func (i indentDoc) toLines(writePrefix func(*strings.Builder), writeSuffix func(*strings.Builder)) []string {
-	return i.item.toLines(func(builder *strings.Builder) {
-		writePrefix(builder)
-		writeIndent(builder, i.indent)
-	}, writeSuffix)
+	return i.item.toLines(
+		func(builder *strings.Builder) {
+			writePrefix(builder)
+			writeIndent(builder, i.indent)
+		}, writeSuffix,
+	)
 }
 
 type linePrefixDoc struct {
@@ -196,6 +202,44 @@ func (seq sequenceDoc) toLines(writePrefix func(*strings.Builder), writeSuffix f
 		lines = append(lines, seq.items[i].toLines(writePrefix, writeSuffix)...)
 	}
 	return lines
+}
+
+type tviewStyleDoc struct {
+	foreground string
+	background string
+	flags      string
+	item       prettyDocImpl
+}
+
+func (d tviewStyleDoc) toLines(writePrefix func(*strings.Builder), writeSuffix func(*strings.Builder)) []string {
+	return d.item.toLines(
+		func(builder *strings.Builder) {
+			writePrefix(builder)
+			builder.WriteString("[")
+			builder.WriteString(d.foreground)
+			builder.WriteString(":")
+			builder.WriteString(d.background)
+			builder.WriteString(":")
+			builder.WriteString(d.flags)
+			builder.WriteString("]")
+		},
+		func(builder *strings.Builder) {
+			builder.WriteString("[")
+			if d.foreground != "" {
+				builder.WriteString("-")
+			}
+			builder.WriteString(":")
+			if d.background != "" {
+				builder.WriteString("-")
+			}
+			builder.WriteString(":")
+			if d.flags != "" {
+				builder.WriteString(strings.ToUpper(d.flags))
+			}
+			builder.WriteString("]")
+			writeSuffix(builder)
+		},
+	)
 }
 
 type escapeCodesDoc struct {
