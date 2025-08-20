@@ -56,6 +56,13 @@ func tui(expr ln_expr.Expr) {
 	selectedRedexIndex := 0
 	redexes := slices.Collect(ln_beta_reduce.BetaRedexes(expr))
 
+	stop := func() {
+		app.Stop()
+		for _, logEntry := range log {
+			fmt.Println(logEntry)
+		}
+	}
+
 	getSelectedRedex := func() *ln_beta_reduce.BetaRedex {
 		count := len(redexes)
 		if count <= 0 {
@@ -75,10 +82,7 @@ func tui(expr ln_expr.Expr) {
 			selectedRedexIndex = 0
 			redexes = slices.Collect(ln_beta_reduce.BetaRedexes(expr))
 		} else {
-			app.Stop()
-			for _, logEntry := range log {
-				fmt.Println(logEntry)
-			}
+			stop()
 		}
 	}
 
@@ -109,19 +113,23 @@ func tui(expr ln_expr.Expr) {
 
 	textView.SetDoneFunc(
 		func(key tcell.Key) {
-			if key == tcell.KeyEnter {
+			switch key {
+			case tcell.KeyESC:
+				stop()
+			case tcell.KeyEnter:
 				step()
 				redraw()
-			} else if len(redexes) > 0 {
-				switch key {
-				case tcell.KeyTab:
+			case tcell.KeyTab:
+				if len(redexes) > 0 {
 					shift(1)
 					redraw()
-				case tcell.KeyBacktab:
+				}
+			case tcell.KeyBacktab:
+				if len(redexes) > 0 {
 					shift(-1)
 					redraw()
-				default:
 				}
+			default:
 			}
 		},
 	)
