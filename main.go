@@ -7,6 +7,7 @@ import (
 	ln_beta_reduce "github.com/gusbicalho/go-lambda/locally_nameless/beta_reduce"
 	ln_expr "github.com/gusbicalho/go-lambda/locally_nameless/expr"
 	ln_pretty "github.com/gusbicalho/go-lambda/locally_nameless/pretty"
+	"github.com/gusbicalho/go-lambda/locally_nameless/walk"
 	"github.com/gusbicalho/go-lambda/parse_tree_to_locally_nameless"
 	"github.com/gusbicalho/go-lambda/parser"
 	"github.com/gusbicalho/go-lambda/tokenizer"
@@ -37,7 +38,8 @@ func main() {
 
 	expr := parse_tree_to_locally_nameless.ToLocallyNameless(*parseTree)
 
-	tui(expr)
+	//tui(expr)
+	tui2(expr)
 	//run(expr)
 }
 
@@ -129,6 +131,86 @@ func tui(expr ln_expr.Expr) {
 					shift(-1)
 					redraw()
 				}
+			default:
+			}
+		},
+	)
+
+	textView.SetBorder(true)
+	if err := app.SetRoot(textView, true).SetFocus(textView).Run(); err != nil {
+		panic(err)
+	}
+}
+
+func tui2(expr ln_expr.Expr) {
+	app := tview.NewApplication()
+	textView := tview.NewTextView().
+		SetDynamicColors(true).
+		SetRegions(true).
+		SetChangedFunc(
+			func() {
+				app.Draw()
+			},
+		)
+
+	log := []string{ln_expr.ToLambdaNotation(expr, ln_expr.DisplayName)}
+	walking := walk.Pre(expr)
+
+	stop := func() {
+		app.Stop()
+		for _, logEntry := range log {
+			fmt.Println(logEntry)
+		}
+	}
+
+	step := func() {
+		if redex := ln_beta_reduce.AsBetaRedex(walking.Focus().Expr); redex != nil {
+			walking = walking.UpdateExpr(func(_ ln_expr.Expr) ln_expr.Expr { return redex.Reduce() })
+			expr = walking.Focus().Realize()
+			log = append(log, ln_expr.ToLambdaNotation(expr, ln_expr.DisplayName))
+		}
+	}
+
+	shift := func(change int) {
+		if change > 0 {
+			if next := walking.Next(); next != nil {
+				walking = next
+			}
+		} else {
+			if prev := walking.Prev(); prev != nil {
+				walking = prev
+			}
+		}
+	}
+
+	redraw := func() {
+		var pretty = walk.ToPrettyDoc(walking).String()
+
+		textView.Clear()
+		fmt.Fprintf(
+			textView, "%s\n\n%s\n\n%s\n%s",
+			ln_expr.ToLambdaNotation(expr, ln_expr.DisplayName),
+			pretty,
+			fmt.Sprint(expr),
+			fmt.Sprint(walking),
+		)
+	}
+	go redraw()
+
+	textView.SetDoneFunc(
+		func(key tcell.Key) {
+			switch key {
+			case tcell.KeyESC:
+				stop()
+			case tcell.KeyEnter:
+				step()
+				redraw()
+			case tcell.KeyTab:
+				shift(1)
+				redraw()
+			case tcell.KeyBacktab:
+				shift(-1)
+				redraw()
 			default:
 			}
 		},
