@@ -25,17 +25,7 @@ type holeImpl interface {
 // Identity
 
 func IdentityHole() Hole {
-	return Hole{identityHole{}}
-}
-
-type identityHole struct{}
-
-func (h identityHole) Fill(expr ln.Expr) ln.Expr {
-	return expr
-}
-
-func (h identityHole) toPrettyDoc(ctx ln.DisplayContext, fill func(ln.DisplayContext) pretty.Doc) pretty.Doc {
-	return fill(ctx)
+	return ComposeHoles()
 }
 
 // Compose
@@ -44,8 +34,6 @@ func ComposeHoles(holes ...Hole) Hole {
 	impls := make([]holeImpl, 0, len(holes))
 	for _, hole := range holes {
 		switch hole := hole.holeImpl.(type) {
-		case identityHole:
-			// Noop - identity holes can be skipped in composition
 		case composeHoles:
 			// We can flatten nested composeHoles
 			impls = append(impls, hole.holes...)
@@ -105,9 +93,12 @@ func (h lambdaBodyHole) toPrettyDoc(ctx ln.DisplayContext, fill func(ln.DisplayC
 	nameLength := uint(len(argName))
 	return pretty.Sequence(
 		pretty.FromString(fmt.Sprint("λ", argName, " ─┬─")),
-		pretty.Indent(nameLength+1, pretty.PrefixLines([]string{"  │ "},
-			fill(ctx),
-		)),
+		pretty.Indent(
+			nameLength+1, pretty.PrefixLines(
+				[]string{"  │ "},
+				fill(ctx),
+			),
+		),
 		pretty.Indent(nameLength+1, pretty.FromString("  ╰─")),
 	)
 }
@@ -128,10 +119,12 @@ func (h appCalleeHole) Fill(expr ln.Expr) ln.Expr {
 func (h appCalleeHole) toPrettyDoc(ctx ln.DisplayContext, fill func(ln.DisplayContext) pretty.Doc) pretty.Doc {
 	return pretty.Sequence(
 		fill(ctx),
-		pretty.PrefixLines([]string{
-			"└► ",
-			"   ",
-		}, ln_pretty.ExprToPrettyDoc(h.arg, ctx)),
+		pretty.PrefixLines(
+			[]string{
+				"└► ",
+				"   ",
+			}, ln_pretty.ExprToPrettyDoc(h.arg, ctx),
+		),
 	)
 }
 
@@ -151,9 +144,11 @@ func (h appArgHole) Fill(expr ln.Expr) ln.Expr {
 func (h appArgHole) toPrettyDoc(ctx ln.DisplayContext, fill func(ln.DisplayContext) pretty.Doc) pretty.Doc {
 	return pretty.Sequence(
 		ln_pretty.ExprToPrettyDoc(h.callee, ctx),
-		pretty.PrefixLines([]string{
-			"└► ",
-			"   ",
-		}, fill(ctx)),
+		pretty.PrefixLines(
+			[]string{
+				"└► ",
+				"   ",
+			}, fill(ctx),
+		),
 	)
 }
