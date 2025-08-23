@@ -3,6 +3,10 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"os"
+	"slices"
+	"strings"
+
 	"github.com/gdamore/tcell/v2"
 	ln_beta_reduce "github.com/gusbicalho/go-lambda/locally_nameless/beta_reduce"
 	ln_expr "github.com/gusbicalho/go-lambda/locally_nameless/expr"
@@ -11,9 +15,6 @@ import (
 	"github.com/gusbicalho/go-lambda/parse_tree_to_locally_nameless"
 	"github.com/gusbicalho/go-lambda/parser"
 	"github.com/gusbicalho/go-lambda/tokenizer"
-	"os"
-	"slices"
-	"strings"
 
 	"github.com/rivo/tview"
 )
@@ -39,7 +40,8 @@ func main() {
 	expr := parse_tree_to_locally_nameless.ToLocallyNameless(*parseTree)
 
 	//tui(expr)
-	tui2(expr)
+	// tui2(expr)
+	tui3(expr)
 	//run(expr)
 }
 
@@ -220,6 +222,161 @@ func tui2(expr ln_expr.Expr) {
 	if err := app.SetRoot(textView, true).SetFocus(textView).Run(); err != nil {
 		panic(err)
 	}
+}
+
+func tui3(expr ln_expr.Expr) {
+	app := tview.NewApplication()
+	textView := newExprView(app)
+
+	log := []string{ln_expr.ToLambdaNotation(expr, ln_expr.DisplayName)}
+	nav := walk.ToNav(expr)
+
+	stop := func() {
+		app.Stop()
+		for _, logEntry := range log {
+			fmt.Println(logEntry)
+		}
+	}
+
+	step := func() {
+		var updated bool
+		nav, updated = nav.UpdateExpr(func(e ln_expr.Expr) *ln_expr.Expr {
+			redex := ln_beta_reduce.AsBetaRedex(e)
+			if redex == nil {
+				return nil
+			}
+			e = redex.Reduce()
+			return &e
+		})
+		if updated {
+			expr = nav.Focus().Realize()
+			log = append(log, ln_expr.ToLambdaNotation(expr, ln_expr.DisplayName))
+		}
+	}
+
+	left := func() {
+		if parent, _ := nav.Parent(); parent != nil {
+			nav = *parent
+		}
+	}
+
+	right := func() {
+		if child := nav.Child(0); child != nil {
+			nav = *child
+		}
+	}
+
+	down := func() {
+		n := &nav
+		for {
+			parent, index := n.Parent()
+			if parent == nil {
+				break
+			}
+			if sibling := parent.Child(index + 1); sibling != nil {
+				nav = *sibling
+				break
+			}
+			n = parent
+		}
+	}
+
+	up := func() {
+		parent, index := nav.Parent()
+		if parent == nil {
+			return
+		}
+		if index > 0 {
+			if sibling := parent.Child(index - 1); sibling != nil {
+				nav = *sibling
+				if child := nav.Child(nav.Children() - 1); child != nil {
+					nav = *child
+				}
+				return
+			}
+		}
+		nav = *parent
+	}
+
+	redraw := func() {
+		var pretty = nav.Focus().ToPrettyDoc().String()
+
+		textView.Clear()
+		fmt.Fprintf(
+			textView, "%s\n\n%s\n\n%s\n%s",
+			ln_expr.ToLambdaNotation(expr, ln_expr.DisplayName),
+			pretty,
+			fmt.Sprint(expr),
+			fmt.Sprint(nav),
+		)
+	}
+	go redraw()
+
+	textView.SetKeyHandler(func(key tcell.Key) bool {
+		switch key {
+		case tcell.KeyESC:
+			stop()
+		case tcell.KeyEnter:
+			step()
+			redraw()
+		case tcell.KeyLeft:
+			left()
+			redraw()
+		case tcell.KeyRight:
+			right()
+			redraw()
+		case tcell.KeyUp:
+			up()
+			redraw()
+		case tcell.KeyDown:
+			down()
+			redraw()
+		default:
+			return false
+		}
+		return true
+	})
+
+	textView.SetBorder(true)
+	if err := app.SetRoot(textView, true).SetFocus(textView).Run(); err != nil {
+		panic(err)
+	}
+}
+
+type exprView struct {
+	*tview.TextView
+	onKey func(tcell.Key) bool
+}
+
+func newExprView(app *tview.Application) *exprView {
+	return &exprView{
+		tview.NewTextView().
+			SetDynamicColors(true).
+			SetRegions(true).
+			SetChangedFunc(
+				func() {
+					app.Draw()
+				},
+			),
+		nil,
+	}
+}
+
+func (t *exprView) SetKeyHandler(onKey func(key tcell.Key) bool) {
+	t.onKey = onKey
+}
+
+func (t *exprView) InputHandler() func(event *tcell.EventKey, setFocus func(p tview.Primitive)) {
+	super := t.TextView.InputHandler()
+	return t.WrapInputHandler(func(event *tcell.EventKey, setFocus func(p tview.Primitive)) {
+		if t.onKey != nil && event != nil {
+			key := event.Key()
+			if t.onKey(key) {
+				return
+			}
+		}
+		super(event, setFocus)
+	})
 }
 
 func run(expr ln_expr.Expr) {
